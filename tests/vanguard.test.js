@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {createTank,makeMaterials} from '../src/models.js';
+const materials=()=>makeMaterials({sand:null,normal:null,height:null,armor:null,concrete:null,rock:null});
+test('Vanguard detail variants preserve articulation and muzzle while reducing gameplay polygons',()=>{const high=createTank('medium',materials(),false,'high'),low=createTank('medium',materials(),false,'low');assert.ok(low.root.userData.triangles<high.root.userData.triangles*.3);for(const model of [high,low]){assert.equal(model.wheels.length,14);model.turret.rotation.y=.7;model.gun.rotation.x=-.2;model.root.updateMatrixWorld(true);}assert.ok(high.muzzlePoint.getWorldPosition(new THREE.Vector3()).distanceTo(low.muzzlePoint.getWorldPosition(new THREE.Vector3()))<1e-6);assert.ok(high.muzzlePoint.getWorldDirection(new THREE.Vector3()).distanceTo(low.muzzlePoint.getWorldDirection(new THREE.Vector3()))<1e-6);});
+test('Vanguard hull and turret faces point outward and receive rays from above',()=>{const model=createTank('medium',materials(),false,'low');model.root.updateMatrixWorld(true);const ray=new THREE.Raycaster(new THREE.Vector3(0,10,0),new THREE.Vector3(0,-1,0)),hits=ray.intersectObject(model.root,true);assert.ok(hits.some(hit=>hit.point.y>1.2&&hit.face.normal.y>.5));model.root.traverse(mesh=>{if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position;assert.ok([...p.array].every(Number.isFinite));});});

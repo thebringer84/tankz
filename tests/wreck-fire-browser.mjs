@@ -1,0 +1,8 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-webgl']});const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+try{await page.goto('http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game.running);await page.locator('[data-action="deploy"]').click();
+ const result=await page.evaluate(()=>{const g=tankz.game;g.running=false;const old=g.rand;g.rand=()=>.1;const p=g.player.root.position,t=g.spawnTank('jeep',p.x+5,p.z-4,true);t.visibleToPlayer=true;g.hurt(t,9999,g.player);g.rand=old;const item=g.wreckFires.items.find(i=>i.target===t);if(!item)throw Error('Death did not create wreck effect');for(let i=0;i<30;i++){g.wreckFires.update(.1);g.fx.update(.1);}g.syncTank(t);g.updateCamera(.016);g.fx.prepare(g.camera);g.presentation.render(.016);return {dead:t.dead,burn:item.burn,flames:item.flames.length};});
+ assert.equal(result.dead,true);assert.equal(result.flames,3);assert.ok(result.burn>=12&&result.burn<=22);await page.screenshot({path:'test-artifacts/burning-jeep.png'});
+ await page.evaluate(()=>{for(let i=0;i<400;i++){tankz.game.wreckFires.update(.1);tankz.game.fx.update(.1);}});assert.equal(await page.evaluate(()=>tankz.game.wreckFires.items.length),0);assert.deepEqual(errors,[]);console.log('Jeep death ignition, rendered flame/smoke, and eventual extinction passed.');
+}finally{await browser.close();}

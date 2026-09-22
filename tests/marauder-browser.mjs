@@ -1,0 +1,15 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-webgl']});const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+const still=async(path,[x,y,z,ly])=>{await page.evaluate(([x,y,z,ly])=>{const g=tankz.game;g.running=false;const p=g.player.root.position;g.camera.position.set(p.x+x,p.y+y,p.z+z);g.camera.lookAt(p.x,p.y+ly,p.z);document.querySelector('#ui').style.display='none';g.presentation.render(0);},[x,y,z,ly]);await page.screenshot({path});await page.evaluate(()=>{document.querySelector('#ui').style.display='';tankz.game.running=true;tankz.game.frame();});};
+try{await page.goto('http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game?.running);await page.evaluate(()=>tankz.game.selectTank('heavy'));await page.waitForTimeout(900);
+ const high=await page.evaluate(()=>({...tankz.game.player.root.userData,name:tankz.game.player.root.name}));assert.equal(high.name,'Marauder');assert.equal(high.detail,'high');
+ // The showroom floor follows each tank's scale, so the Marauder's tracks rest on it.
+ const gap=await page.evaluate(async()=>{const THREE=await import('/node_modules/.vite/deps/three.js');const g=tankz.game;g.root.updateMatrixWorld(true);return new THREE.Box3().setFromObject(g.player.root).min.y-new THREE.Box3().setFromObject(g.showroom.getObjectByName('service-bay-floor')).max.y;});assert.ok(Math.abs(gap)<.03,`floor gap ${gap}`);
+ // Every generated Kestrel map reaches the showroom material.
+ assert.deepEqual(await page.evaluate(()=>{const a=tankz.game.player.armor;return [a.map,a.normalMap,a.roughnessMap,a.specularColorMap].map(t=>!!t?.image?.width);}),[true,true,true,true]);
+ await still('test-artifacts/marauder-front.png',[-6.5,4.2,-8.5,.6]);await still('test-artifacts/marauder-side.png',[10,2.2,0,.5]);await still('test-artifacts/marauder-rear.png',[4.6,3,4.8,.6]);
+ await page.locator('[data-action="deploy"]').click();const low=await page.evaluate(()=>({...tankz.game.player.root.userData}));assert.equal(low.detail,'low');assert.ok(low.triangles<high.triangles*.3);
+ assert.equal(await page.evaluate(()=>!!tankz.game.player.armor.bumpMap?.image&&tankz.game.player.exhausts.length===2),true);
+ await page.waitForTimeout(400);await page.keyboard.press('Space');await page.waitForTimeout(200);await page.screenshot({path:'test-artifacts/marauder-gameplay.png'});await still('test-artifacts/marauder-gameplay-close.png',[6.5,4.2,7.5,.5]);await still('test-artifacts/marauder-gameplay-lit.png',[-6.5,4.2,-7.5,.5]);
+ assert.deepEqual(errors,[]);console.log('Marauder detail selection, generated maps, rendering and deployment passed.',{high,low});}finally{await browser.close();}

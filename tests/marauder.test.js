@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {createTank,makeMaterials} from '../src/models.js';
+import {TANKS} from '../src/config.js';
+const materials=()=>makeMaterials({sand:null,normal:null,height:null,armor:null,concrete:null,rock:null});
+test('Marauder detail variants share articulation, muzzle and exhausts while cutting gameplay polygons',()=>{const high=createTank('heavy',materials(),false,'high'),low=createTank('heavy',materials(),false,'low');assert.ok(low.root.userData.triangles<high.root.userData.triangles*.3,`${low.root.userData.triangles} vs ${high.root.userData.triangles}`);for(const model of [high,low]){assert.equal(model.root.name,'Marauder');assert.equal(model.root.scale.x,TANKS.heavy.scale);assert.equal(model.wheels.length,20);assert.equal(model.exhausts.length,2);model.turret.rotation.y=.7;model.gun.rotation.x=-.2;model.root.updateMatrixWorld(true);}for(const pick of [m=>m.muzzlePoint,m=>m.exhausts[1]])assert.ok(pick(high).getWorldPosition(new THREE.Vector3()).distanceTo(pick(low).getWorldPosition(new THREE.Vector3()))<1e-6);assert.ok(high.muzzlePoint.getWorldDirection(new THREE.Vector3()).distanceTo(low.muzzlePoint.getWorldDirection(new THREE.Vector3()))<1e-6);});
+test('Marauder is the biggest tank, sits on its tracks and fits its collider',()=>{const size=type=>new THREE.Box3().setFromObject(createTank(type,materials(),false,'low').root).getSize(new THREE.Vector3());const heavy=size('heavy');for(const type of ['scout','medium'])assert.ok(heavy.x>size(type).x&&heavy.y>size(type).y&&heavy.z>size(type).z);
+ for(const detail of ['high','low']){const model=createTank('heavy',materials(),false,detail);model.root.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model.root),s=TANKS.heavy.scale,[hx,hz]=TANKS.heavy.hull;assert.ok(Math.abs(bounds.min.y/s+.98)<.02,`track base ${bounds.min.y/s}`);
+  // Only the angled plough wings, stacks and gun may overhang the collider appreciably.
+  const hull=new THREE.Box3();for(const o of model.body.children)if(o.isMesh)hull.expandByObject(o);assert.ok(hull.max.x/s<hx+.25&&hull.max.z/s<hz+.25,JSON.stringify(hull));
+  model.root.traverse(mesh=>{if(!mesh.isMesh)return;assert.ok([...mesh.geometry.attributes.position.array].every(Number.isFinite));if(mesh.material===model.armor)assert.ok([...mesh.geometry.attributes.uv.array].every(Number.isFinite));});}});
