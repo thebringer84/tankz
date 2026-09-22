@@ -131,16 +131,28 @@ export function createMarauder(materials,enemy=false,detail='low'){
  pipe(turret,gunMetal,[-.52,1.34,.93],[-.52,1.34,1.0],.032,.013,.06,high?14:6);
  if(high){lathe(turret,receiver,[[.036,.3],[.036,.62],[.026,.64]],-.52,1.34,0,16);for(let k=0;k<6;k++)for(let a=0;a<4;a++){const t=a/4*Math.PI*2+.4,hole=cyl(turret,dark,-.52+Math.cos(t)*.0362,1.34+Math.sin(t)*.0362,.34+k*.05,.008,.004,'y',.008,6);hole.quaternion.setFromUnitVectors(V(0,1,0),V(Math.cos(t),Math.sin(t),0));}
   box(turret,receiver,-.52,1.405,.14,.1,.02,.2);for(const x of [-.04,.04])rod(turret,gunMetal,[-.52+x,1.32,-.07],[-.52+x,1.27,-.15],.012);rod(turret,gunMetal,[-.56,1.27,-.15],[-.48,1.27,-.15],.012);box(turret,gunMetal,-.52,1.38,.9,.008,.05,.012);box(turret,gunMetal,-.45,1.34,.16,.03,.02,.04);}
- // Roof rocket pod on a pylon, twelve tubes facing forward.
- box(turret,metal,.62,1.0,-.85,.12,.24,.2);box(turret,armor,.62,1.36,-.87,.62,.48,.68);
- // Front face cut with twelve tube openings; each bore shows the nose of a loaded rocket inside.
- const podHoles=[];for(let i=0;i<4;i++)for(let j=0;j<3;j++)podHoles.push([-.19+i*.127,-.13+j*.13]);holedPlate(turret,armor,.62,1.36,-.53,.62,.48,.04,podHoles,.05);
- for(const [hx,hy] of podHoles){lathe(turret,bore,[[.05,0],[.05,-.34],[0,-.34]],.62+hx,1.36+hy,-.49,high?14:6);const nose=add(turret,new THREE.ConeGeometry(.04,.1,high?12:6).rotateX(Math.PI/2),red,.62+hx,1.36+hy,-.62);if(high)ring(turret,steel,.62+hx,1.36+hy,-.487,.054,.008,'z',12);}
- if(high)rod(turret,steel,[.36,.9,-.6],[.4,1.14,-.6],.02);
+ // Roof rocket pod on a trunnion yoke: one extruded shell whose twelve holes run its full length as tubes,
+ // each holding a rocket whose ogive nose and warhead band peek out of the face.
+ const pod={x:.62,y:1.36,front:-.5,length:.64,w:.62,h:.48},podHoles=[];for(let i=0;i<4;i++)for(let j=0;j<3;j++)podHoles.push([-.19+i*.127,-.13+j*.13]);
+ const shellShape=new THREE.Shape(),hw=pod.w/2,hh=pod.h/2,cr=.045;shellShape.moveTo(-hw+cr,-hh);shellShape.lineTo(hw-cr,-hh);shellShape.quadraticCurveTo(hw,-hh,hw,-hh+cr);shellShape.lineTo(hw,hh-cr);shellShape.quadraticCurveTo(hw,hh,hw-cr,hh);shellShape.lineTo(-hw+cr,hh);shellShape.quadraticCurveTo(-hw,hh,-hw,hh-cr);shellShape.lineTo(-hw,-hh+cr);shellShape.quadraticCurveTo(-hw,-hh,-hw+cr,-hh);
+ for(const [hx,hy] of podHoles){const hole=new THREE.Path();hole.absarc(hx,hy,.05,0,Math.PI*2,true);shellShape.holes.push(hole);}
+ const bevel=high?.012:0;add(turret,new THREE.ExtrudeGeometry(shellShape,{depth:pod.length-bevel*2,bevelEnabled:high,bevelSize:bevel,bevelThickness:bevel,bevelSegments:2,curveSegments:high?16:6}),armor,pod.x,pod.y,pod.front-pod.length+bevel);
+ box(turret,metal,pod.x,pod.y,pod.front-pod.length-.008,pod.w-.03,pod.h-.03,.03);
+ for(const z of [pod.front-.14,pod.front-.5]){box(turret,metal,pod.x,pod.y,z,pod.w+.03,pod.h+.03,.035);if(high)for(const s of [-1,1])for(const y of [-.15,.15])bolt(turret,pod.x+s*(pod.w/2+.018),pod.y+y,z);}
+ // Rockets in the jerry cans' paints: worn olive bodies and distressed red warhead ogives, a small dark fuze at the tip.
+ const rocketBody=[[0,-.5],[.041,-.5],[.041,-.13],[0,-.13]],warhead=[[0,-.13],[.041,-.13],[.0395,-.1],[.035,-.075],[.028,-.05],[.019,-.03],[.01,-.014],[0,-.006]];
+ podHoles.forEach(([hx,hy],k)=>{const x=pod.x+hx,y=pod.y+hy,tip=pod.front+.15+((k*37)%5)*.008,sides=high?20:6;
+  lathe(turret,bore,[[.049,pod.front-.002],[.049,pod.front-.5]],x,y,0,high?16:6);
+  lathe(turret,olive,rocketBody,x,y,tip,sides);lathe(turret,red,warhead,x,y,tip,sides);if(high)ring(turret,steel,x,y,tip-.13,.0412,.003,'z',16);
+  lathe(turret,dark,[[0,-.012],[.009,-.012],[.006,0],[0,.002]],x,y,tip,high?12:5);});
+ // Yoke: base plate, post and saddle, side lugs with trunnion pins and an elevation strut.
+ cyl(turret,metal,pod.x,.905,pod.front-.37,.16,.04);cyl(turret,metal,pod.x,1.0,pod.front-.37,.06,.16);box(turret,metal,pod.x,1.1,pod.front-.37,.34,.04,.36);
+ for(const s of [-1,1]){box(turret,metal,pod.x+s*(pod.w/2+.03),1.22,pod.front-.37,.04,.24,.14);cyl(turret,steel,pod.x+s*(pod.w/2+.05),1.29,pod.front-.37,.035,.03,'x');}
+ if(high){cyl(turret,metal,pod.x,.93,pod.front+.03,.045,.06);rod(turret,metal,[pod.x,.94,pod.front+.03],[pod.x,1.04,pod.front-.12],.032);rod(turret,steel,[pod.x,1.02,pod.front-.09],[pod.x,1.1,pod.front-.2],.018);}
  // Bustle rack with jerry cans and bedrolls, and the aerials.
  box(turret,bedroll,-.35,.45,-1.75,.5,.3,.26);box(turret,olive,.12,.45,-1.72,.3,.34,.2);box(turret,red,.45,.45,-1.72,.3,.34,.2);
  if(high){for(const x of [-.7,-.3,.1,.5,.8])rod(turret,steel,[x,.2,-1.58],[x,.66,-1.9],.014);rod(turret,steel,[-.8,.66,-1.9],[.8,.66,-1.9],.014);rod(turret,steel,[-.8,.3,-1.66],[.8,.3,-1.66],.014);cyl(turret,bedroll,-.35,.7,-1.78,.12,.5,'x');}
- const aerial=rod(turret,dark,[-.8,.8,-1.3],[-.86,2.5,-1.36],.01);aerial.name='radio-aerial';rod(turret,dark,[.9,.8,-1.2],[.93,1.9,-1.24],.008);
+ const aerial=rod(turret,dark,[-.8,.8,-1.3],[-.86,2.5,-1.36],.01);aerial.name='radio-aerial';
 
  if(high){cyl(turret,armor,.45,.95,.3,.2,.1);cyl(turret,steel,.2,.95,-.4,.12,.08);for(const x of [-.9,.9])for(const z of [-1.2,-.6,0,.6])bolt(turret,x,.9,z,'y');}
 
