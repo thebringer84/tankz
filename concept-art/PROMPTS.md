@@ -8,7 +8,7 @@ Use case: ui-mockup. Asset type: full-screen widescreen 16:9 browser game concep
 
 ## 01-main-menu
 
-Main menu screen. Large TANKZ wordmark and vertical menu left: "PLAY", "GARAGE", "SETTINGS", "QUIT". Right two-thirds shows a compact olive medium tank parked at a makeshift desert maintenance bay, dusty tracks, hand-painted chipped armor, orange welding light in background, torn shade cloth, ruined industrial buildings and distant smoke. Cinematic close three-quarter vehicle view, no humans. Small footer "DESERT COMBAT". Selected PLAY gets amber bar. Beautiful strong title screen.
+Main menu screen. Large TANKZ wordmark and vertical menu left: "PLAY", "GARAGE", "SETTINGS", "QUIT". Right two-thirds shows a compact olive medium tank parked at a makeshift desert maintenance bay, dusty tracks, hand-painted chipped armor, orange welding light in background, torn shade cloth, ruined industrial buildings and distant smoke. Cinematic close three-quarter vehicle view, no humans. Small footer "ARMORED COMBAT". Selected PLAY gets amber bar. Beautiful strong title screen.
 
 ## 02-garage-loadout
 
@@ -33,4 +33,3 @@ Post-match results screen. Heading "MATCH COMPLETE", amber subheading "VICTORY".
 ## 07-world-effects
 
 Use case: stylized-concept. Make a single landscape production concept reference board, NOT a game UI, for same TANKZ art direction. Clear grid with generous spacing, six richly illustrated areas with short labels only. "TERRAIN": raised cutaway 3D desert mesh patch showing rolling sandy jump, gravel and exposed bedrock organically splatted with broad color breakup. "COVER": coherent kit of broken concrete building corner, blasted wall with rebar, boulders, shrubs, barrels and low crawlable rubble. "TANK CLASSES": side by side olive SCOUT, MEDIUM, HEAVY with unmistakably different proportions and guns, all tracked and compact. "EXPLOSION": visual left-to-right progression of white-orange flash, orange fireball with flying debris, charcoal smoke and fading dusty aftermath. "DUST & TRACKS": tank drifting around a bend with paired curved track impressions, dust plume and grounded suspension, plus small jumping tank with clear ground shadow. "DECALS": top view craters, scorches, tread marks and chipped impact scars blending into sand, not floating stickers. Hand-painted materials on solid 3D forms, production-quality reference art. This board is concept only, do not claim these are usable texture maps. No normal-map swatches.
-

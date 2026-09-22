@@ -1,8 +1,10 @@
+import {createCannonProjectile} from './projectile-visuals.js';
+import {DustRenderer} from './vehicle-dust.js';
 import * as THREE from 'three';
-import {terrainHeight,seededRandom} from './config.js';
+import {terrainHeight,seededRandom,MAP_SIZE,TERRAIN_SEGMENTS,AMMO} from './config.js';
 export class Effects {
  constructor(scene,smokeTexture,textures={}){
-  this.scene=scene;this.time=0;this.particles=[];this.decals=[];this.screens=[];this.rand=seededRandom(414);this.max=3600;
+  this.scene=scene;this.time=0;this.particles=[];this.decals=[];this.screens=[];this.rand=seededRandom(414);this.max=3600;this.projectileTemplates=Object.entries(AMMO).map(([key,ammo])=>{const root=createCannonProjectile(ammo,key);root.visible=false;scene.add(root);return root;});
   const geo=new THREE.BufferGeometry();for(const [key,width] of [['position',3],['aColor',3],['aSize',1],['aAlpha',1],['aKind',1],['aRotation',1],['aAge',1]])geo.setAttribute(key,new THREE.BufferAttribute(new Float32Array(this.max*width),width));
   const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{smokeTex:{value:smokeTexture},fireTex:{value:textures.fire||smokeTexture},sparkTex:{value:textures.sparks||smokeTexture},hotPass:{value:0},time:{value:0}},vertexShader:`attribute float aAge;varying float vAge;attribute vec3 aColor;attribute float aSize;attribute float aAlpha;attribute float aKind;attribute float aRotation;varying vec3 vColor;varying float vAlpha;varying float vKind;varying float vRotation;void main(){vAge=aAge;vColor=aColor;vAlpha=aAlpha;vKind=aKind;vRotation=aRotation;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=min(300.,aSize*740./max(1.,-mv.z));gl_Position=projectionMatrix*mv;}`,fragmentShader:`uniform sampler2D smokeTex;uniform sampler2D fireTex;uniform sampler2D sparkTex;uniform float hotPass,time;varying float vAge;varying vec3 vColor;varying float vAlpha;varying float vKind;varying float vRotation;void main(){bool hot=vKind>.5&&vKind<3.5;if((hotPass>.5)!=hot)discard;vec2 p=gl_PointCoord-.5;float c=cos(vRotation),s=sin(vRotation);vec2 uv=mat2(c,-s,s,c)*p+.5;if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.)discard;if(!hot){vec2 flow=vec2(sin(uv.y*13.+time*.7+vRotation),cos(uv.x*11.-time*.5+vRotation));uv+=flow*.018*sin(vAge*3.14159);}
 vec4 texel=texture2D(smokeTex,clamp(uv,0.,1.));if(vKind<-.5){float radius=length(p);float detail=texture2D(smokeTex,clamp(uv,0.,1.)).a;float envelope=(1.-smoothstep(.12,.5,radius));texel.a=envelope*mix(.26,1.,detail);texel.rgb=vec3(.42+detail*.58);}
@@ -15,13 +17,20 @@ gl_FragColor=vec4(color,alpha);
   const hotMat=mat.clone();hotMat.uniforms.hotPass.value=1;hotMat.blending=THREE.AdditiveBlending;hotMat.toneMapped=false;this.hotPoints=new THREE.Points(geo,hotMat);this.hotPoints.frustumCulled=false;this.hotPoints.renderOrder=1;scene.add(this.hotPoints);
   this.lights=Array.from({length:6},()=>{const light=new THREE.PointLight(0xff913c,0,28,2);scene.add(light);return {light,life:0,total:1,power:0};});
   const flashGeo=new THREE.PlaneGeometry(1,1).rotateX(Math.PI/2).translate(0,0,.5);
-  this.muzzleFlashes=Array.from({length:24},()=>{const material=new THREE.ShaderMaterial({uniforms:{age:{value:0},seed:{value:0}},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,toneMapped:false,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float age,seed;varying vec2 vUv;void main(){float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float turbulence=.8+.2*sin(t*39.+seed+sin(vUv.x*27.)*2.);float a=(1.-smoothstep(w*.25,w*turbulence,edge))*pow(1.-t,.6)*pow(1.-age,1.8);vec3 color=mix(vec3(3.,2.5,1.5),vec3(1.5,.3,.035),clamp(t*.9+age*.6,0.,1.));gl_FragColor=vec4(color,a);
+  this.muzzleFlashes=Array.from({length:24},()=>{const material=new THREE.ShaderMaterial({uniforms:{age:{value:0},seed:{value:0},cannon:{value:0},blastTex:{value:textures.cannonMuzzle||textures.fire||smokeTexture}},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,toneMapped:false,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float age,seed,cannon;uniform sampler2D blastTex;varying vec2 vUv;void main(){
+if(cannon>.5){vec2 uv=vec2((vUv.x-.5)/(1.+age*.3)+.5,vUv.y);uv.x+=sin(uv.y*21.+seed+age*8.)*.009*age;vec4 plume=texture2D(blastTex,uv);float fade=pow(1.-age,1.35);vec3 heat=mix(vec3(2.8,2.5,1.8),vec3(1.15,.48,.15),age);float padding=smoothstep(0.,.08,vUv.y)*(1.-smoothstep(.93,1.,vUv.y));gl_FragColor=vec4(plume.rgb*heat,plume.a*fade*padding*.8);return;}
+float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float turbulence=.8+.2*sin(t*39.+seed+sin(vUv.x*27.)*2.);float a=(1.-smoothstep(w*.25,w*turbulence,edge))*pow(1.-t,.6)*pow(1.-age,1.8);vec3 color=mix(vec3(3.,2.5,1.5),vec3(1.5,.3,.035),clamp(t*.9+age*.6,0.,1.));gl_FragColor=vec4(color,a);
 #include <colorspace_fragment>
 }`});const group=new THREE.Group();for(let i=0;i<2;i++){const mesh=new THREE.Mesh(flashGeo,material);mesh.rotation.z=i*Math.PI/2;group.add(mesh);}group.visible=false;scene.add(group);return {group,material,life:0,total:1,anchor:null};});
   this.rocketLights=Array.from({length:2},()=>{const light=new THREE.PointLight(0xff9a3d,0,5,2);scene.add(light);return light;});
-  const groundGLSL=`uniform sampler2D terrainSurface;uniform float useTerrainSurface;float groundBaseY(vec2 p){float x=p.x,z=p.y;return .65*sin(x*.058)*cos(z*.047)+.35*sin(x*.15+z*.11)+5.8*exp(-(pow(x-23.,2.)/180.+pow(z-8.,2.)/360.))+4.7*exp(-(pow(x+34.,2.)/240.+pow(z+29.,2.)/180.))+3.8*exp(-(pow(x-5.,2.)/320.+pow(z+52.,2.)/140.))+4.*exp(-(pow(x+48.,2.)/230.+pow(z-49.,2.)/240.))+2.7*exp(-(pow(x+12.,2.)/50.+pow(z-3.,2.)/20.));}`;
-  const surfaceGLSL=groundGLSL+`float groundY(vec2 p){if(useTerrainSurface<.5)return groundBaseY(p);vec2 cell=clamp((p+110.)/(220./180.),vec2(0.),vec2(179.999)),f=fract(cell),uv=(floor(cell)+.5)/181.;float a=texture2D(terrainSurface,uv).r,b=texture2D(terrainSurface,uv+vec2(1./181.,0.)).r,c=texture2D(terrainSurface,uv+vec2(0.,1./181.)).r,d=texture2D(terrainSurface,uv+vec2(1./181.)).r;return f.x+f.y<=1.?a+(b-a)*f.x+(c-a)*f.y:d+(c-d)*(1.-f.x)+(b-d)*(1.-f.y);}`;
-  this.surfaceUniforms={terrainSurface:{value:null},useTerrainSurface:{value:0}};
+  const groundGLSL=`uniform sampler2D terrainSurface;uniform float useTerrainSurface,mapSize,terrainSegments;float groundBaseY(vec2 p){float x=p.x,z=p.y;return .65*sin(x*.058)*cos(z*.047)+.35*sin(x*.15+z*.11)+5.8*exp(-(pow(x-23.,2.)/180.+pow(z-8.,2.)/360.))+4.7*exp(-(pow(x+34.,2.)/240.+pow(z+29.,2.)/180.))+3.8*exp(-(pow(x-5.,2.)/320.+pow(z+52.,2.)/140.))+4.*exp(-(pow(x+48.,2.)/230.+pow(z-49.,2.)/240.))+2.7*exp(-(pow(x+12.,2.)/50.+pow(z-3.,2.)/20.));}`;
+  const surfaceGLSL=groundGLSL+`float groundY(vec2 p){if(useTerrainSurface<.5)return groundBaseY(p);vec2 cell=clamp((p+mapSize*.5)/(mapSize/terrainSegments),vec2(0.),vec2(terrainSegments-.001)),f=fract(cell),uv=(floor(cell)+.5)/(terrainSegments+1.);float a=texture2D(terrainSurface,uv).r,b=texture2D(terrainSurface,uv+vec2(1./(terrainSegments+1.),0.)).r,c=texture2D(terrainSurface,uv+vec2(0.,1./(terrainSegments+1.))).r,d=texture2D(terrainSurface,uv+vec2(1./(terrainSegments+1.))).r;return f.x+f.y<=1.?a+(b-a)*f.x+(c-a)*f.y:d+(c-d)*(1.-f.x)+(b-d)*(1.-f.y);}`;
+  this.surfaceUniforms={mapSize:{value:MAP_SIZE},terrainSegments:{value:TERRAIN_SEGMENTS,AMMO},terrainSurface:{value:null},useTerrainSurface:{value:0}};
+  this.vehicleDust=new DustRenderer(scene,textures.dustBillow||smokeTexture,this.surfaceUniforms,surfaceGLSL,this.max);
+  const headingMat=new THREE.ShaderMaterial({uniforms:{...this.surfaceUniforms},transparent:true,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-3,toneMapped:false,
+   vertexShader:surfaceGLSL+`varying vec2 vUv;void main(){vUv=uv;vec4 wp=modelMatrix*vec4(position,1.);wp.y=groundY(wp.xz)+.10;gl_Position=projectionMatrix*viewMatrix*wp;}`,
+   fragmentShader:`varying vec2 vUv;void main(){vec2 p=vUv*2.-1.;float line=abs(p.y-(.55-abs(p.x)*.8));float tail=abs(p.y-(-.25-abs(p.x)*.8));float shape=max(1.-smoothstep(.065,.115,line),(1.-smoothstep(.04,.08,tail))*.45);float ends=1.-smoothstep(.65,.92,abs(p.x));gl_FragColor=vec4(.42,.83,.76,shape*ends*.62);}`});
+  this.headingMarker=new THREE.Mesh(new THREE.PlaneGeometry(2.4,1.9,12,12).rotateX(Math.PI/2),headingMat);this.headingMarker.name='Hull forward marker';this.headingMarker.visible=false;this.headingMarker.frustumCulled=false;scene.add(this.headingMarker);
   const waveGeo=new THREE.PlaneGeometry(2,2,24,24).rotateX(-Math.PI/2);
   this.shockwaves=Array.from({length:8},()=>{const material=new THREE.ShaderMaterial({uniforms:{...this.surfaceUniforms,age:{value:0},seed:{value:0}},transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,side:THREE.DoubleSide,vertexShader:surfaceGLSL+`varying vec2 vUv;void main(){vUv=uv;vec4 wp=modelMatrix*vec4(position,1.);wp.y=groundY(wp.xz)+.09;gl_Position=projectionMatrix*viewMatrix*wp;}`,fragmentShader:`uniform float age,seed;varying vec2 vUv;void main(){vec2 p=vUv*2.-1.;float angle=atan(p.y,p.x),r=length(p);float wobble=sin(angle*9.+seed)*.022+sin(angle*17.-seed)*.012;float ridge=exp(-pow((r-.77-wobble)/(.075+age*.11),2.));float broken=.6+.4*sin(angle*13.+seed)*sin(angle*7.-seed);float alpha=ridge*broken*.3*smoothstep(0.,.07,age)*pow(1.-age,1.6);gl_FragColor=vec4(.29,.205,.12,alpha);
 #include <tonemapping_fragment>
@@ -32,15 +41,15 @@ gl_FragColor=vec4(color,alpha);
   // Short strips within a stamp form visible paired tread impressions.
   treadMat.onBeforeCompile=s=>{Object.assign(s.uniforms,this.surfaceUniforms);s.vertexShader=surfaceGLSL+'\n'+s.vertexShader;s.vertexShader=s.vertexShader.replace('#include <project_vertex>','vec4 wp=modelMatrix*instanceMatrix*vec4(transformed,1.);wp.y=groundY(wp.xz)+.065;vec4 mvPosition=viewMatrix*wp;gl_Position=projectionMatrix*mvPosition;');};
   const pos=[],uv=[];for(let i=0;i<4;i++){let z=-.3+i*.18;pos.push(-.26,0,z,.26,0,z,-.26,0,z+.07,.26,0,z,.26,0,z+.07,-.26,0,z+.07);}const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));tg.computeVertexNormals();
-  this.tracks=new THREE.InstancedMesh(tg,treadMat,3200);this.tracks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.trackIndex=0;this.trackCount=0;this.tracks.count=0;this.tracks.frustumCulled=false;scene.add(this.tracks);
+  this.tracks=new THREE.InstancedMesh(tg,treadMat,3200);this.tracks.renderOrder=-2;this.tracks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.trackIndex=0;this.trackCount=0;this.tracks.count=0;this.tracks.frustumCulled=false;scene.add(this.tracks);
   const scorchMat=new THREE.ShaderMaterial({uniforms:{...this.surfaceUniforms,craterTex:{value:textures.crater||smokeTexture}},transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-3,side:THREE.DoubleSide,vertexShader:surfaceGLSL+`varying vec2 vUv;void main(){vUv=uv;vec4 wp=modelMatrix*instanceMatrix*vec4(position,1.);wp.y=groundY(wp.xz)+.06;gl_Position=projectionMatrix*viewMatrix*wp;}`,fragmentShader:`uniform sampler2D craterTex;varying vec2 vUv;void main(){vec4 decal=texture2D(craterTex,vUv);gl_FragColor=vec4(decal.rgb*.76,decal.a*.88);
 #include <tonemapping_fragment>
-#include <colorspace_fragment>}`});  this.scorches=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2),scorchMat,100);this.scorches.count=0;this.scorches.frustumCulled=false;this.scorchIndex=0;scene.add(this.scorches);this.dummy=new THREE.Object3D();
+#include <colorspace_fragment>}`});  this.scorches=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2),scorchMat,100);this.scorches.renderOrder=-2;this.scorches.count=0;this.scorches.frustumCulled=false;this.scorchIndex=0;scene.add(this.scorches);this.dummy=new THREE.Object3D();
   const smearMat=scorchMat.clone();Object.assign(smearMat.uniforms,this.surfaceUniforms);smearMat.vertexShader=smearMat.vertexShader.replace('varying vec2 vUv;','varying vec2 vUv;varying float vSeed;').replace('vUv=uv;','vUv=uv;vSeed=instanceMatrix[3].x*1.73+instanceMatrix[3].z*2.91;');smearMat.fragmentShader=`varying float vSeed;varying vec2 vUv;float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7))+vSeed)*43758.5453);}float stainNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}void main(){vec2 p=vUv*2.-1.;float r=length(p);float ragged=.78+.065*sin(p.y*37.+vSeed)+.06*sin(p.x*29.-vSeed);float alpha=(1.-smoothstep(.25,ragged,r))*.82;float streak=.65+.35*stainNoise(p*11.);gl_FragColor=vec4(vec3(.25,.014,.020)*(.8+.2*sin(vSeed)),alpha*streak);}`;
-  this.smears=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1,8,8).rotateX(-Math.PI/2),smearMat,192);this.smears.count=0;this.smears.frustumCulled=false;this.smearIndex=0;scene.add(this.smears);
+  this.smears=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1,8,8).rotateX(-Math.PI/2),smearMat,192);this.smears.renderOrder=-2;this.smears.count=0;this.smears.frustumCulled=false;this.smearIndex=0;scene.add(this.smears);
 
  }
- emit(p,v,color,size,life,kind='dust',delay=0){if(this.particles.length>=this.max)this.particles.shift();this.particles.push({p:p.clone(),v:v.clone(),color:new THREE.Color(color),size,life,total:life,kind,delay,rotation:this.rand()*6.28,spin:(this.rand()-.5)*(kind==='smoke'?.22:1.4)});}
+ emit(p,v,color,size,life,kind='dust',delay=0){if(this.particles.length>=this.max)this.particles.shift();this.particles.push({enemyFire:!!this.enemyFire,p:p.clone(),v:v.clone(),color:new THREE.Color(color),size,life,total:life,kind,delay,rotation:this.rand()*6.28,spin:(this.rand()-.5)*(kind==='smoke'?.22:1.4)});}
  blood(pos,direction,scale=1){
   const axis=direction.clone().normalize();for(let i=0;i<Math.ceil(28*scale);i++){const velocity=axis.clone().multiplyScalar((2+this.rand()*5)*scale).add(new THREE.Vector3((this.rand()-.5)*5,1+this.rand()*4,(this.rand()-.5)*5));this.emit(pos,velocity,i%3?0x79131b:0xb62a27,.08+this.rand()*.18,.7+this.rand()*.8,'blood');this.particles.at(-1).stain=this.rand()<.4;}
   this.smear(pos,this.rand()*6.28,.3*scale);
@@ -48,12 +57,28 @@ gl_FragColor=vec4(color,alpha);
  bloodBurst(pos,direction,scale=1){this.blood(pos,direction.lengthSq()>.01?direction:new THREE.Vector3(0,1,0),Math.min(2,1.2*scale));for(let i=0;i<4;i++){const p=pos.clone().add(new THREE.Vector3((this.rand()-.5)*1.8,0,(this.rand()-.5)*1.8));this.smear(p,this.rand()*6.28,(.18+this.rand()*.35)*scale);}}
  bloodTrail(pos,velocity){for(let i=0;i<2;i++){this.emit(pos,velocity.clone().multiplyScalar(.15).add(new THREE.Vector3((this.rand()-.5)*.7,-.5,(this.rand()-.5)*.7)),0x8d1620,.07+this.rand()*.08,.6+this.rand()*.4,'blood');this.particles.at(-1).stain=this.rand()<.4;}}
  bloodLanding(pos,scale){this.smear(pos,this.rand()*6.28,scale);for(let i=0;i<5;i++){this.emit(pos,new THREE.Vector3((this.rand()-.5)*2,.6+this.rand(),(this.rand()-.5)*2),0x971d25,.07,.25,'blood');}}
- dust(pos,velocity,scale=1,outward=new THREE.Vector3()){
-  const energy=THREE.MathUtils.clamp(Math.hypot(velocity.x,velocity.z)/14,0,1);
-  // One source per track: suspended dust rapidly loses track-ejection momentum.
-  const v=outward.clone().multiplyScalar(.12+energy*.25);v.y=.12+energy*.22;
-  const source=pos.clone().addScaledVector(outward,(this.rand()-.5)*.22);
-  this.emit(source,v,0x9b805b,(1.6+energy*1.5)*scale,3+energy*3+this.rand()*.6,'dust');const p=this.particles.at(-1);p.trail=true;p.density=.07+energy*.065;p.spin*=.1;
+ dust(pos,velocity,scale=1,outward=new THREE.Vector3(),options={}){
+  const intensity=options.intensity??THREE.MathUtils.clamp(Math.hypot(velocity.x,velocity.z)/14,0,1),pivot=!!options.pivot;
+  const v=outward.clone().multiplyScalar(.45+intensity*.65);v.y=.42+intensity*.48;
+  if(options.forward)v.addScaledVector(options.forward,-Math.sign(options.trackSpeed||1)*(.45+intensity*.7));
+  const source=pos.clone().addScaledVector(outward,(this.rand()-.5)*.28);
+  this.emit(source,v,0xa07245,(1.1+intensity*.75)*scale,3.6+intensity*2.5+this.rand()*.7,'dust');
+  const p=this.particles.at(-1);Object.assign(p,{trail:true,vehicleDust:true,density:.19+intensity*.13,spread:pivot?1.7:1.1,wind:.45});p.spin*=.12;
+ }
+ dustWake(pos,velocity,scale=1,intensity=1,pivot=false){
+  const p=pos.clone().add(new THREE.Vector3((this.rand()-.5)*.8,.25,(this.rand()-.5)*.8)),v=velocity.clone().multiplyScalar(.04);v.y=.45+intensity*.3;
+  this.emit(p,v,0xa97d50,(3.4+intensity*1.4)*scale,5.2+intensity*2+this.rand(),'dust');
+  Object.assign(this.particles.at(-1),{trail:true,vehicleDust:true,wake:true,density:.09+intensity*.055,spread:pivot?2:1.7,spin:(this.rand()-.5)*.11,wind:.6});
+ }
+ landingDust(pos,yaw,scale,energy,softness=1,surface=terrainHeight){
+  const strength=THREE.MathUtils.clamp(Math.sqrt(Math.max(0,energy)/14000),.2,3),count=Math.round(12+strength*10),co=Math.cos(yaw),si=Math.sin(yaw);
+  for(let i=0;i<count;i++){
+   const angle=i/count*Math.PI*2+(this.rand()-.5)*.28,x=Math.cos(angle),z=Math.sin(angle),dir=new THREE.Vector3(x*co+z*si,0,z*co-x*si),p=pos.clone().addScaledVector(dir,(1.1+this.rand()*.6)*scale);p.y=surface(p.x,p.z)+.22;
+   const v=dir.multiplyScalar((1.5+strength*2.4)*(.75+this.rand()*.5));v.y=.3+strength*.35;
+   this.emit(p,v,0xa07245,(1.2+strength*.65)*scale,(2.7+strength*.85)*( .85+this.rand()*.3),'dust',this.rand()*.045);
+   Object.assign(this.particles.at(-1),{trail:true,vehicleDust:true,landing:true,density:(.15+strength*.07)*softness,spread:1+strength*.3,wind:.45,spin:(this.rand()-.5)*.15});
+  }
+  this.dustWake(pos.clone().setY(surface(pos.x,pos.z)+.65),new THREE.Vector3(),scale,strength*softness,true);
  }
  flameStream(pos,dir,length){
   const reach=Math.max(.05,length),side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();
@@ -62,7 +87,7 @@ gl_FragColor=vec4(color,alpha);
   const tip=pos.clone().addScaledVector(dir,Math.min(reach*.85,8));this.emit(tip,new THREE.Vector3(.25,1.8,.15),0x514136,.8+this.rand()*.5,1.5,'smoke',.08);this.particles.at(-1).density=.23;
   for(let i=0;i<2;i++)this.emit(pos,dir.clone().multiplyScalar(15+this.rand()*5).addScaledVector(side,(this.rand()-.5)*2),0xffb54b,.055+this.rand()*.05,Math.min(.55,reach/20),'ember');this.flash(pos,85,.08,6);
  }
- updateRocketLights(shells){const active=shells.filter(s=>s.rocket&&!s.dead);for(let i=0;i<this.rocketLights.length;i++){const light=this.rocketLights[i],s=active[i];light.intensity=s?22:0;if(s)light.position.copy(s.body.translation());}}
+ updateRocketLights(shells){const active=shells.filter(s=>s.rocket&&!s.dead&&s.mesh?.visible!==false);for(let i=0;i<this.rocketLights.length;i++){const light=this.rocketLights[i],s=active[i];light.intensity=s?22:0;if(s)light.position.copy(s.body.translation());}}
  rocketTrail(from,to,shell){const delta=to.clone().sub(from),distance=delta.length();if(distance<.00001)return;const direction=delta.clone().normalize();for(let d=.3-(shell.trailDistance||0);d<=distance;d+=.3){const p=from.clone().addScaledVector(direction,d);this.emit(p,direction.clone().multiplyScalar(-.3).add(new THREE.Vector3(0,.25,0)),0x8d887d,.38+this.rand()*.18,1.2+this.rand()*.5,'smoke');this.particles.at(-1).density=.24;}shell.trailDistance=((shell.trailDistance||0)+distance)%.3;this.emit(to,direction.multiplyScalar(-1.5),0xffac48,.45,.07,'fire');}
  damageSmoke(tank,dt){
   const ratio=tank.hp/tank.cfg.hp;if(tank.dead||ratio>.4){tank.damageSmokeTimer=0;return;}
@@ -82,8 +107,8 @@ gl_FragColor=vec4(color,alpha);
   }
  }}
  smoke(pos,big=false){for(let i=0;i<(big?45:2);i++)this.emit(pos,new THREE.Vector3((this.rand()-.5)*(big?8:1),2+this.rand()*2,(this.rand()-.5)*(big?8:1)),big?0x9b9a8e:0x343735,big?4:1.2,big?8:3.5,'smoke');}
- flash(pos,power,duration,distance=25){const available=this.lights.filter(l=>!l.reserved),slot=available.find(l=>l.life<=0)||available.reduce((a,b)=>a.life<b.life?a:b);slot.light.position.copy(pos).add(new THREE.Vector3(0,.8,0));slot.light.distance=distance;slot.light.intensity=power;slot.power=power;slot.life=slot.total=duration;}
- muzzleJet(pos,dir,scale=1,anchor=null){const item=this.muzzleFlashes.find(f=>f.life<=0)||this.muzzleFlashes.reduce((a,b)=>a.life<b.life?a:b);item.group.position.copy(pos);item.group.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),dir.clone().normalize());item.group.rotateZ(this.rand()*Math.PI);item.group.scale.set(scale*(.8+this.rand()*.35),scale,scale*(1.1+this.rand()*.5));item.life=item.total=scale>1?.075:.045;item.material.uniforms.age.value=0;item.material.uniforms.seed.value=this.rand()*100;item.anchor=anchor;item.group.visible=true;}
+ flash(pos,power,duration,distance=25){const available=this.lights.filter(l=>!l.reserved),slot=available.find(l=>l.life<=0)||available.reduce((a,b)=>a.life<b.life?a:b);slot.enemyFire=!!this.enemyFire;slot.light.position.copy(pos).add(new THREE.Vector3(0,.8,0));slot.light.distance=distance;slot.light.intensity=power;slot.power=power;slot.life=slot.total=duration;}
+ muzzleJet(pos,dir,scale=1,anchor=null){const item=this.muzzleFlashes.find(f=>f.life<=0)||this.muzzleFlashes.reduce((a,b)=>a.life<b.life?a:b);item.enemyFire=!!this.enemyFire;item.group.position.copy(pos);item.group.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),dir.clone().normalize());item.group.rotateZ(this.rand()*Math.PI);item.group.scale.set(scale*(.8+this.rand()*.35),scale,scale*(1.1+this.rand()*.5));item.life=item.total=scale>2?.16:scale>1?.075:.045;item.presented=false;item.material.uniforms.cannon.value=scale>2?1:0;item.material.uniforms.age.value=0;item.material.uniforms.seed.value=this.rand()*100;item.anchor=anchor;item.group.visible=true;}
  shockwave(pos,size){const wave=this.shockwaves.find(w=>!w.mesh.visible)||this.shockwaves.reduce((a,b)=>a.age/a.duration>b.age/b.duration?a:b);wave.mesh.position.copy(pos);wave.size=size;wave.age=0;wave.duration=1.15;wave.mesh.scale.setScalar(.3);wave.mesh.material.uniforms.age.value=0;wave.mesh.material.uniforms.seed.value=this.rand()*100;wave.mesh.visible=true;}
  explosion(pos,size=1,variant='standard'){
   const profile=variant==='jeep'?['fuel','pressure','cookoff'][Math.floor(this.rand()*3)]:variant;
@@ -102,24 +127,23 @@ gl_FragColor=vec4(color,alpha);
  machineGun(pos,dir,anchor=null){this.muzzleJet(pos,dir,.7,anchor);this.muzzle(pos,dir);this.emit(pos,dir.clone().multiplyScalar(1.6).add(new THREE.Vector3(0,.4,0)),0x82786a,.48,.55,'smoke',.035);this.flash(pos,38,.09,3.5);}
  ricochet(pos,normal,velocity){this.muzzle(pos,normal);const reflected=velocity.clone().normalize();for(let i=0;i<9;i++)this.emit(pos,reflected.clone().multiplyScalar(5+this.rand()*12).add(new THREE.Vector3((this.rand()-.5)*4,this.rand()*3,(this.rand()-.5)*4)),0xffd897,.07,.2+this.rand()*.3,'ember');}
  cannon(pos,dir,chassis,scale=1,anchor=null){
-  this.muzzleJet(pos,dir,2.7*scale,anchor);const side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();for(const sign of [-1,1])this.muzzleJet(pos,side.clone().multiplyScalar(sign).addScaledVector(dir,.25).normalize(),1.1*scale);
-  this.flash(pos,450*scale,.12,15*scale);this.emit(pos,dir.clone().multiplyScalar(7),0xffffff,2.2*scale,.055,'spark');
-  for(let i=0;i<4;i++)this.emit(pos.clone().addScaledVector(dir,i*.25),dir.clone().multiplyScalar(5+i*2),0xffffff,(1.7-i*.2)*scale,.06+this.rand()*.055,'fire');
-  for(let i=0;i<8;i++)this.emit(pos,dir.clone().multiplyScalar(3+this.rand()*3).add(new THREE.Vector3((this.rand()-.5)*2,.7,(this.rand()-.5)*2)),0x978872,.8+this.rand()*.6,.65+this.rand()*.6,'smoke',.08);
-  for(let i=0;i<20;i++){const a=i/20*Math.PI*2;const p=chassis.clone().add(new THREE.Vector3(Math.sin(a)*1.5,0,Math.cos(a)*1.5));p.y=terrainHeight(p.x,p.z)+.12;this.emit(p,new THREE.Vector3(Math.sin(a)*4,.45,Math.cos(a)*4),0xb39266,.95*scale,.75+this.rand()*.55,'dust');}
-  const ground=pos.clone();ground.y=terrainHeight(pos.x,pos.z)+.13;for(let i=0;i<6;i++)this.emit(ground,dir.clone().multiplyScalar(4+this.rand()*3).setY(.4),0xb39266,1.2*scale,1.1,'dust');
+  this.muzzleJet(pos,dir,4.2*scale,anchor);const side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();for(const sign of [-1,1])this.muzzleJet(pos,side.clone().multiplyScalar(sign).addScaledVector(dir,.25).normalize(),1.1*scale);
+  this.flash(pos,950*scale,.18,19*scale);this.emit(pos,dir.clone().multiplyScalar(7),0xffffff,2.2*scale,.055,'spark');
+  for(let i=0;i<8;i++)this.emit(pos,dir.clone().multiplyScalar(3+this.rand()*3).add(new THREE.Vector3((this.rand()-.5)*2,.7,(this.rand()-.5)*2)),0xb0a38f,(1.15+this.rand()*.6)*scale,1.2+this.rand()*.7,'smoke',.045);
+  for(let i=0;i<20;i++){const a=i/20*Math.PI*2;const p=chassis.clone().add(new THREE.Vector3(Math.sin(a)*1.5,0,Math.cos(a)*1.5));p.y=terrainHeight(p.x,p.z)+.12;this.emit(p,new THREE.Vector3(Math.sin(a)*4,.45,Math.cos(a)*4),0xb39266,1.2*scale,1.35+this.rand()*.65,'dust');this.particles.at(-1).blastDust=true;this.particles.at(-1).density=.16;}
+  const ground=pos.clone();ground.y=terrainHeight(pos.x,pos.z)+.13;this.shockwave(ground,.55*scale);for(let i=0;i<6;i++)this.emit(ground,dir.clone().multiplyScalar(4+this.rand()*3).setY(.4),0xb39266,1.2*scale,1.1,'dust');
  }
  tread(pos,yaw,width){for(const side of [-1,1]){const x=pos.x+Math.cos(yaw)*width*side,z=pos.z-Math.sin(yaw)*width*side;this.dummy.position.set(x,terrainHeight(x,z)+.035,z);this.dummy.rotation.set(0,yaw,0);this.dummy.scale.set(1,1,1);this.dummy.updateMatrix();this.tracks.setMatrixAt(this.trackIndex++%3200,this.dummy.matrix);}this.tracks.count=Math.min(3200,this.trackIndex);this.tracks.instanceMatrix.needsUpdate=true;}
  scorch(pos,size){this.dummy.position.set(pos.x,terrainHeight(pos.x,pos.z)+.07,pos.z);this.dummy.rotation.set(0,this.rand()*6.28,0);this.dummy.scale.setScalar(size);this.dummy.updateMatrix();this.scorches.setMatrixAt(this.scorchIndex++%100,this.dummy.matrix);this.scorches.count=Math.min(100,this.scorchIndex);this.scorches.instanceMatrix.needsUpdate=true;}
  smear(pos,yaw,scale=1){this.dummy.position.copy(pos);this.dummy.rotation.set(0,yaw,0);this.dummy.scale.set((.8+this.rand()*.7)*scale,1,(1.5+this.rand()*2.5)*scale);this.dummy.updateMatrix();this.smears.setMatrixAt(this.smearIndex++%192,this.dummy.matrix);this.smears.count=Math.min(192,this.smearIndex);this.smears.instanceMatrix.needsUpdate=true;}
  update(dt,prepare=true){
-  for(const f of this.muzzleFlashes){if(f.life<=0)continue;f.life=Math.max(0,f.life-dt);f.group.visible=f.life>0;f.material.uniforms.age.value=1-f.life/f.total;if(f.anchor&&f.group.visible){f.anchor.getWorldPosition(f.group.position);f.anchor.getWorldQuaternion(f.group.quaternion);}}
+  for(const f of this.muzzleFlashes){if(f.life<=0)continue;if(f.presented)f.life=Math.max(0,f.life-dt);f.group.visible=f.life>0;f.material.uniforms.age.value=1-f.life/f.total;if(f.anchor&&f.group.visible){f.anchor.getWorldPosition(f.group.position);f.anchor.getWorldQuaternion(f.group.quaternion);}}
   for(const w of this.shockwaves){if(!w.mesh.visible)continue;w.age+=dt;const t=Math.min(1,w.age/w.duration);w.mesh.material.uniforms.age.value=t;w.mesh.scale.setScalar(w.size*(.3+10*Math.pow(t,.65)));if(t>=1)w.mesh.visible=false;}
   this.updateScreens(dt);this.time+=dt;this.points.material.uniforms.time.value=this.time;this.hotPoints.material.uniforms.time.value=this.time;
   for(const slot of this.lights){if(slot.reserved)continue;slot.life=Math.max(0,slot.life-dt);slot.light.intensity=slot.power*Math.pow(slot.life/slot.total,2);}
   for(let i=this.particles.length-1;i>=0;i--){const p=this.particles[i];if(p.delay>0){p.delay-=dt;continue;}p.life-=dt;if(p.life<=0){this.particles.splice(i,1);continue;}
    const age=p.total-p.life,progress=age/p.total;
-   if(p.flameJet){p.v.copy(p.jetDir).multiplyScalar(20).addScaledVector(p.jetSide,Math.sin(age*18+p.phase)*age*5);p.v.y+=age*2;}else if(p.blastDust){p.v.multiplyScalar(Math.exp(-dt*2.3));}else if(p.screen){p.v.multiplyScalar(Math.exp(-dt*.8));}else if(p.trail){p.v.x+=(.1-p.v.x)*(1-Math.exp(-dt*1.8));p.v.z+=(.04-p.v.z)*(1-Math.exp(-dt*1.8));p.v.y*=Math.exp(-dt*.6);}else if(p.kind==='smoke'){
+   if(p.flameJet){p.v.copy(p.jetDir).multiplyScalar(20).addScaledVector(p.jetSide,Math.sin(age*18+p.phase)*age*5);p.v.y+=age*2;}else if(p.blastDust){p.v.multiplyScalar(Math.exp(-dt*2.3));}else if(p.screen){p.v.multiplyScalar(Math.exp(-dt*.8));}else if(p.vehicleDust){const blend=1-Math.exp(-dt*(p.landing?1.1:1.5)),wind=p.wind||.45;p.v.x+=(wind+Math.sin(p.p.z*.16+this.time*.3)*.14-p.v.x)*blend;p.v.z+=(.16+Math.cos(p.p.x*.12-this.time*.25)*.12-p.v.z)*blend;p.v.y+=(.06-p.v.y)*(1-Math.exp(-dt*.65));}else if(p.trail){p.v.x+=(.1-p.v.x)*(1-Math.exp(-dt*1.8));p.v.z+=(.04-p.v.z)*(1-Math.exp(-dt*1.8));p.v.y*=Math.exp(-dt*.6);}else if(p.kind==='smoke'){
     const follow=1-Math.exp(-dt*(p.blast?1.5:p.plume?1.2:.35)),phase=p.p.y*.5-this.time*.65;
     const windX=.65+Math.sin(phase+p.p.z*.09)*.42,windZ=.18+Math.cos(phase*.8+p.p.x*.08)*.32;
     p.v.x+=(windX-p.v.x)*follow;p.v.z+=(windZ-p.v.z)*follow;
@@ -129,11 +153,17 @@ gl_FragColor=vec4(color,alpha);
   }
   if(prepare)this.prepare();
  }
+ // Project hull-forward chevrons onto the same surface as the terrain decals.
+ updateHeading(tank,visible){const marker=this.headingMarker;marker.visible=visible&&!tank.dead;if(!marker.visible)return;const p=tank.root.position,yaw=tank.yaw,scale=tank.cfg.scale;marker.position.set(p.x+Math.sin(yaw)*4.3*scale,0,p.z+Math.cos(yaw)*4.3*scale);marker.rotation.y=yaw;marker.scale.setScalar(scale);}
  // Sort alpha smoke/dust along the view direction, independent of emission order.
  prepare(camera){
-  const a=this.points.geometry.attributes,visible=this.particles.filter(p=>p.delay<=0);
+  for(const flash of this.muzzleFlashes)if(flash.group.visible)flash.presented=true;
+  for(const flash of this.muzzleFlashes)if(flash.enemyFire&&flash.group.visible&&!this.visibility?.sampledVisible(flash.group.position))flash.group.visible=false;
+  for(const slot of this.lights)if(slot.enemyFire&&!this.visibility?.sampledVisible(slot.light.position))slot.light.intensity=0;
+  const a=this.points.geometry.attributes,visible=this.particles.filter(p=>p.delay<=0&&(!p.enemyFire||this.visibility?.sampledVisible(p.p)));
   if(camera){camera.updateMatrixWorld();const m=camera.matrixWorldInverse.elements;for(const p of visible)p.depth=-(m[2]*p.p.x+m[6]*p.p.y+m[10]*p.p.z+m[14]);visible.sort((a,b)=>b.depth-a.depth);}
-  let n=0;for(const p of visible){const progress=1-p.life/p.total,age=p.total-p.life,hot=['spark','ember','fire'].includes(p.kind),smoke=p.kind==='smoke';
+  this.vehicleDust.prepare(visible,camera);
+  let n=0;for(const p of visible){if(p.vehicleDust)continue;const progress=1-p.life/p.total,age=p.total-p.life,hot=['spark','ember','fire'].includes(p.kind),smoke=p.kind==='smoke';
    const growth=p.screen?1+progress*.65:p.trail?1+progress*1.8:smoke?(p.blast?1+Math.sqrt(age)*1.05:p.plume?1+Math.sqrt(age)*1.3:1+Math.sqrt(age)*.7):1+progress*(p.flameJet?3.5:hot?.5:1.9);
    const fade=hot?Math.pow(1-progress,.6):Math.min(1,age/(smoke?.3:.08))*Math.pow(1-progress,smoke?.85:.65);
    a.position.setXYZ(n,p.p.x,p.p.y,p.p.z);a.aColor.setXYZ(n,p.color.r,p.color.g,p.color.b);a.aSize.setX(n,p.size*growth);
@@ -142,5 +172,5 @@ gl_FragColor=vec4(color,alpha);
   for(const attribute of Object.values(a))attribute.needsUpdate=true;this.points.geometry.setDrawRange(0,n);
  }
 
- clear(){for(const light of this.rocketLights)light.intensity=0;for(const f of this.muzzleFlashes){f.life=0;f.group.visible=false;f.anchor=null;}for(const w of this.shockwaves)w.mesh.visible=false;this.screens.length=0;this.particles.length=0;for(const slot of this.lights){slot.life=0;slot.light.intensity=0;}this.tracks.count=0;this.trackIndex=0;this.scorches.count=0;this.scorchIndex=0;this.smears.count=0;this.smearIndex=0;}
+ clear(){this.vehicleDust.mesh.geometry.instanceCount=0;this.headingMarker.visible=false;for(const light of this.rocketLights)light.intensity=0;for(const f of this.muzzleFlashes){f.life=0;f.group.visible=false;f.anchor=null;}for(const w of this.shockwaves)w.mesh.visible=false;this.screens.length=0;this.particles.length=0;for(const slot of this.lights){slot.life=0;slot.light.intensity=0;}this.tracks.count=0;this.trackIndex=0;this.scorches.count=0;this.scorchIndex=0;this.smears.count=0;this.smearIndex=0;}
 }

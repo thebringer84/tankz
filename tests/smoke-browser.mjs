@@ -2,15 +2,16 @@ import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 await mkdir('test-artifacts',{recursive:true});
+const baseUrl=process.env.TANKZ_URL||'http://localhost:5173';
 const browser=await chromium.launch({...(process.env.TANKZ_BROWSER==='chromium'?{}:{channel:'chrome'}),headless:true,args:['--enable-webgl']});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
 const errors=[];
 page.on('pageerror',e=>errors.push(e.stack));
 page.on('console',msg=>{if(msg.type()==='error')errors.push(msg.text()+' '+JSON.stringify(msg.location()));});
-page.on('response',r=>{if(r.url().startsWith('http://localhost:5173')&&r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
+page.on('response',r=>{if(r.url().startsWith(baseUrl)&&r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
 try{
- await page.goto('http://localhost:5173');
- await page.waitForFunction(()=>window.tankz?.game?.running,{timeout:30000});
+ await page.goto(baseUrl);
+ await page.waitForFunction(()=>window.tankz?.game?.running,{timeout:120000});
  const menuPosition=await page.evaluate(()=>({...tankz.game.player.body.translation()}));
  await page.waitForTimeout(800);
  assert.deepEqual(await page.evaluate(()=>({...tankz.game.player.body.translation()})),menuPosition,'showroom must remain stationary');
@@ -22,13 +23,15 @@ try{
  await page.locator('[data-action="buy"][data-value="he"]').click();
  assert.deepEqual(await page.evaluate(()=>({credits:tankz.game.credits,rounds:tankz.game.inventory.he})),{credits:750,rounds:8});
  await page.screenshot({path:'test-artifacts/garage.png'});
+ await page.locator('[data-action="menu"]').click();await page.waitForFunction(()=>!tankz.ui.transitioning&&!tankz.game.showroomTransition);
  await page.locator('[data-action="deploy"]').click();
+ await page.waitForFunction(()=>!tankz.game.loading&&tankz.game.mode==='playing',{timeout:120000});
  await page.waitForTimeout(1000);
- const start=await page.evaluate(()=>({...tankz.game.player.body.translation()}));
+ const start=await page.evaluate(()=>({position:{...tankz.game.player.body.translation()},time:tankz.game.time}));
  await page.mouse.move(960,350);
  await page.keyboard.down('w');await page.waitForTimeout(1800);await page.keyboard.up('w');
- const moved=await page.evaluate(()=>({...tankz.game.player.body.translation()}));
- assert.ok(Math.hypot(moved.x-start.x,moved.z-start.z)>3,'W must move the tank');
+ const moved=await page.evaluate(()=>({position:{...tankz.game.player.body.translation()},time:tankz.game.time,speed:tankz.game.player.speed,mode:tankz.game.mode}));
+ assert.ok(Math.hypot(moved.position.x-start.position.x,moved.position.z-start.position.z)>3,`W must move the tank: ${JSON.stringify({start,moved})}`);
  await page.keyboard.press('2');
  await page.keyboard.down('Space');
  await page.waitForFunction(()=>tankz.game.inventory.he<8,{timeout:5000});
@@ -45,9 +48,10 @@ try{
  assert.equal(await page.evaluate(()=>tankz.game.timer),frozen,'pause must stop simulation');
  await page.screenshot({path:'test-artifacts/settings.png'});
  await page.locator('[data-action="resume"]').click();
+ await page.waitForFunction(()=>tankz.game.mode==='playing');
  assert.equal(await page.evaluate(()=>tankz.game.mode),'playing');
  assert.ok(await page.evaluate(()=>tankz.game.tanks.filter(t=>t.enemy).every(t=>t.jeep&&t.crew.length===2)),'opposition must be crewed jeeps');
- assert.ok(await page.evaluate(()=>{const g=tankz.game;return g.tanks.filter(t=>t.enemy&&!t.dead).every(t=>t.root.visible===t.visibleToPlayer)&&g.visibility.data.some(v=>v===0)&&g.presentation.bloom.enabled;}),'fog hides unseen units and bloom is enabled');
+ assert.ok(await page.evaluate(()=>{const g=tankz.game;return g.tanks.filter(t=>t.enemy&&!t.dead).every(t=>t.root.visible===(t.visibilityOpacity>.005))&&g.visibility.data.some(v=>v===0)&&g.presentation.bloom.enabled;}),'fog presentation opacity controls unit rendering and bloom is enabled');
  await page.setViewportSize({width:1280,height:800});await page.waitForTimeout(200);await page.setViewportSize({width:1440,height:900});
 
  await page.evaluate(()=>{const g=tankz.game,j=g.tanks.find(t=>t.enemy&&!t.dead);g.hurt(j,230,g.player);});
@@ -57,20 +61,21 @@ try{
  await page.screenshot({path:'test-artifacts/jeeps-and-ragdolls.png'});
  assert.ok(await page.evaluate(()=>tankz.game.fx.tracks.count>0),'driving must stamp tracks');
  // Exercise actual damage/reward/result transitions without requiring an AI full match.
- await page.evaluate(()=>{const g=tankz.game;for(const t of g.tanks.filter(t=>t.enemy&&!t.dead))g.hurt(t,100000,g.player);while(g.spawned<8){g.spawnEnemy(g.spawned);g.hurt(g.tanks.at(-1),100000,g.player);}});
+ await page.evaluate(()=>{const g=tankz.game;for(const t of g.tanks.filter(t=>t.enemy&&!t.dead))g.hurt(t,100000,g.player);while(g.spawned<25){g.spawnEnemy(g.spawned);g.hurt(g.tanks.at(-1),100000,g.player);}});
  assert.equal(await page.evaluate(()=>tankz.game.mode),'results');
- assert.equal(await page.evaluate(()=>tankz.game.kills),8);
+ assert.equal(await page.evaluate(()=>tankz.game.kills),25);
  await page.screenshot({path:'test-artifacts/results.png'});
  await page.locator('[data-action="deploy"]').click();
+ await page.waitForFunction(()=>!tankz.game.loading&&tankz.game.mode==='playing',{timeout:120000});
  assert.equal(await page.evaluate(()=>tankz.game.kills),0);
  assert.equal(await page.evaluate(()=>tankz.game.player.hp),1000);
- assert.equal(await page.evaluate(()=>tankz.game.tanks.length),4);
+ assert.equal(await page.evaluate(()=>tankz.game.tanks.length),26);
  await page.keyboard.press('Escape');
  await page.locator('[data-action="leave"]').click();
  const remaining=await page.evaluate(()=>tankz.game.inventory.he);
  await page.reload();await page.waitForFunction(()=>window.tankz?.game?.running);
  assert.equal(await page.evaluate(()=>tankz.game.inventory.he),remaining,'spent ammunition must persist');
- assert.equal(await page.evaluate(()=>tankz.game.credits),2010,'purchases and match rewards must persist');
+ assert.equal(await page.evaluate(()=>tankz.game.credits),4050,'purchases and match rewards must persist');
  console.log('Browser integration passed: rendering, static menus, tank selection, purchases, driving, Space fire, Q smoke, jeeps, ragdolls, tracks, pause, victory, rematch and persistence.');
  assert.deepEqual(errors,[],'No browser, shader, or local asset errors');
 } finally {await browser.close();}

@@ -1,6 +1,17 @@
 export const FIXED_DT = 1 / 60;
 export const GRAVITY = -18;
-export const MAP_SIZE = 220;
+// 500% more area: six original battlefields, preserving vehicle/world scale.
+export const MAP_SIZE = 220 * Math.sqrt(6);
+export const MAP_HALF = MAP_SIZE / 2;
+export const TERRAIN_SEGMENTS = 432;
+export const INFANTRY_COUNT = 250;
+export const JEEP_COUNT = 25;
+export const MATCH_DURATION = 900;
+export const JUMP_RIDGES = [];
+for(let row=-2;row<=2;row++)for(let col=-2;col<=2;col++){
+ if(row===0&&col===0)continue;
+ JUMP_RIDGES.push({x:col*92+(row%2)*13,z:row*92+(col%2)*11,yaw:(row+col)*.7,width:11,run:18,drop:5,height:3.8+((row-col+4)%3)*.45});
+}
 export const TANKS = {
   scout: { name:'KESTREL', role:'LIGHT RECON', number:'06', hp:650, mass:1000, speed:23, power:15500, traverse:2.8, elevation:1.1, reload:1.05, damage:0.7, scale:0.86, color:0x92916a, desc:'Fast feet. Faster reactions. Circle the heavy armor and make every shot count.', stats:[96,42,95,45] },
   medium:{ name:'VANGUARD', role:'MAIN BATTLE TANK', number:'23', hp:1000, mass:1550, speed:18, power:20500, traverse:1.6, elevation:0.65, reload:1.65, damage:1, scale:1, color:0x858976, desc:'A dependable balance of mobility, firepower and protection. Built for the thick of it.', stats:[73,72,72,72] },
@@ -20,12 +31,14 @@ export function ballisticElevation(distance,height,speed,gravity=-GRAVITY){
 }
 export function terrainHeight(x,z){
   // Rolling lanes with distinct dunes to launch from. Exact same samples feed the collider.
-  return .65*Math.sin(x*.058)*Math.cos(z*.047)+.35*Math.sin(x*.15+z*.11)
+  let height=.65*Math.sin(x*.058)*Math.cos(z*.047)+.35*Math.sin(x*.15+z*.11)
     +5.8*Math.exp(-((x-23)**2/180+(z-8)**2/360))
     +4.7*Math.exp(-((x+34)**2/240+(z+29)**2/180))
     +3.8*Math.exp(-((x-5)**2/320+(z+52)**2/140))
     +4*Math.exp(-((x+48)**2/230+(z-49)**2/240))
     +2.7*Math.exp(-((x+12)**2/50+(z-3)**2/20));
+  for(const r of JUMP_RIDGES){const dx=x-r.x,dz=z-r.z;if(Math.abs(dx)>35||Math.abs(dz)>35)continue;const across=dx*Math.cos(r.yaw)-dz*Math.sin(r.yaw),along=dx*Math.sin(r.yaw)+dz*Math.cos(r.yaw);if(Math.abs(across)>r.width||along < -r.run||along>r.drop)continue;const edge=clamp((Math.abs(across)-r.width*.45)/(r.width*.55),0,1),side=1-edge*edge*(3-2*edge),ramp=along<0?Math.pow((along+r.run)/r.run,1.3):1-along/r.drop;height+=r.height*ramp*side;}
+  return height;
 }
 export function seededRandom(seed=8173){return ()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296;};}
 

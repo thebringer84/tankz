@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
-import {loft,trackLoop,band,flatten,batch} from './tank-geometry.js';
+import {loft,trackLoop,band,flatten,batch,gearMaterial} from './tank-geometry.js';
+import {createDrone} from './recon-drone.js';
 
 // Kestrel: a low faceted recon hull, unmanned wedge turret, sensor mast, active protection
 // launchers and a docked recon drone (concept-art/08-kestrel-scout.png). Both detail levels
@@ -9,17 +10,26 @@ import {loft,trackLoop,band,flatten,batch} from './tank-geometry.js';
 export function createKestrel(materials,enemy=false,detail='low'){
  const high=detail==='high',segments=high?28:10,root=new THREE.Group(),body=new THREE.Group(),turret=new THREE.Group(),gun=new THREE.Group(),wheels=[];
  root.name='Kestrel';root.userData.detail=detail;root.add(body);body.position.y=-.2;
- const armor=kestrelArmor(materials.kestrel||{},enemy,high),{dark,track,canvas}=materials,steel=high?materials.steel.clone():materials.steel;
- if(high){steel.roughness=.38;steel.metalness=.85;steel.envMapIntensity=1.1;}
+ const gearMaps=materials.vanguard||{},armor=kestrelArmor(materials.kestrel||{},enemy,high),dark=gearMaterial(gearMaps,high,0x3a3935,.4,1.6),steel=gearMaterial(gearMaps,high,0xc8c6be,.8,1.6),track=gearMaterial(gearMaps,high,0x5a5650,0,1.8);
+ const canvas=new THREE.MeshStandardMaterial({map:gearMaps.canvas||null,normalMap:high?gearMaps.canvasNormal||null:null,bumpMap:high?null:gearMaps.canvasBump||null,color:0xd8d0b4,roughness:1});canvas.userData.projectUV={scale:1.6};
  const paint=new THREE.MeshStandardMaterial({color:0xe3dbc0,roughness:.95});
- const glass=new THREE.MeshStandardMaterial({color:0x0e1c24,roughness:.12,metalness:.75,emissive:0x0d3a46,emissiveIntensity:high?.7:.35});
- const led=new THREE.MeshStandardMaterial({color:0xeef8ff,emissive:0xd8efff,emissiveIntensity:2.4});
- const tail=new THREE.MeshStandardMaterial({color:0xff5a3a,emissive:0xd8321c,emissiveIntensity:1.5});
+ // Coated optical glass: near-black, glossy, with a thin-film sheen; lamps are emissive LED segments behind clear covers.
+ const glass=high?new THREE.MeshPhysicalMaterial({color:0x03070a,roughness:.04,metalness:0,clearcoat:1,clearcoatRoughness:.02,iridescence:.7,iridescenceIOR:1.8,iridescenceThicknessRange:[260,520],envMapIntensity:.9,emissive:0x07262b,emissiveIntensity:.35})
+  :new THREE.MeshStandardMaterial({color:0x06101a,roughness:.1,metalness:.5,emissive:0x0a2c34,emissiveIntensity:.3});
+ const led=new THREE.MeshStandardMaterial({color:0xeef8ff,emissive:0xd8efff,emissiveIntensity:high?3.2:2.4});
+ const tail=new THREE.MeshStandardMaterial({color:0xff4a30,emissive:0xff2410,emissiveIntensity:high?3.4:2.4});
+ const cover=high?new THREE.MeshPhysicalMaterial({color:0xffffff,roughness:.06,metalness:0,transparent:true,opacity:.22,clearcoat:1,envMapIntensity:1.2,depthWrite:false}):null;
+ const radarFace=new THREE.MeshStandardMaterial({color:0x151816,roughness:.72,metalness:.1,normalMap:high?gearMaps.gearNormal||null:null,normalScale:new THREE.Vector2(.25,.25)});radarFace.userData.projectUV={scale:3};
+ const bezel=new THREE.MeshStandardMaterial({color:0x151816,roughness:.5,metalness:.6}),bore=new THREE.MeshStandardMaterial({color:0x050505,roughness:.75,metalness:.3,envMapIntensity:.15,side:THREE.DoubleSide});
  const amber=new THREE.MeshStandardMaterial({color:0xffa640,emissive:0xc86a12,emissiveIntensity:.9});
  const add=(parent,geo,mat,x=0,y=0,z=0)=>{const mesh=new THREE.Mesh(geo,mat);mesh.position.set(x,y,z);mesh.castShadow=mesh.receiveShadow=true;parent.add(mesh);return mesh;};
  const box=(p,m,x,y,z,w,h,d)=>add(p,high?new RoundedBoxGeometry(w,h,d,1,Math.min(.015,w*.2,h*.2,d*.2)):new THREE.BoxGeometry(w,h,d),m,x,y,z);
  const cyl=(p,m,x,y,z,r,h,axis='y',top=r,sides=segments)=>{const geo=new THREE.CylinderGeometry(top,r,h,sides);if(axis==='x')geo.rotateZ(Math.PI/2);if(axis==='z')geo.rotateX(Math.PI/2);return add(p,geo,m,x,y,z);};
  const ring=(p,m,x,y,z,r,t,axis='z')=>{const geo=new THREE.TorusGeometry(r,t,high?6:3,segments);if(axis==='x')geo.rotateY(Math.PI/2);if(axis==='y')geo.rotateX(Math.PI/2);return add(p,geo,m,x,y,z);};
+ // Lathe profiles are [radius, axial] pairs along +z; a dark bore lathe makes any tube end a real opening.
+ const lathe=(p,m,profile,x=0,y=0,z=0,sides=segments)=>add(p,new THREE.LatheGeometry(profile.map(([r,a])=>new THREE.Vector2(r,a)),sides).rotateX(Math.PI/2),m,x,y,z);
+ // Lamp: dark bezel recessed into the plate, emissive LED segments and a clear cover over them.
+ const lamp=(p,m,x,y,z,w,h,dir,count)=>{box(p,bezel,x,y,z,w+.04,h+.035,.035);for(let i=0;i<count;i++){const seg=(w-.01)/count;box(p,m,x-w/2+seg*(i+.5)+.005,y,z+dir*.012,seg*.82,h,.02);}if(cover)add(p,new THREE.BoxGeometry(w+.012,h+.012,.006),cover,x,y,z+dir*.024).castShadow=false;};
  const rod=(p,m,a,b,r=.02)=>{const from=new THREE.Vector3(...a),to=new THREE.Vector3(...b),delta=to.sub(from);const mesh=cyl(p,m,0,0,0,r,delta.length(),'y',r,high?8:5);mesh.position.copy(from).addScaledVector(delta,.5);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());return mesh;};
  const bolt=(p,x,y,z,axis='x')=>{const geo=new THREE.CylinderGeometry(.022,.022,.018,6);if(axis==='x')geo.rotateZ(Math.PI/2);if(axis==='z')geo.rotateX(Math.PI/2);add(p,geo,steel,x,y,z);};
  // Cross-section: bottom centre, one side's points upward, top centre, then the mirror.
@@ -53,32 +63,33 @@ export function createKestrel(materials,enemy=false,detail='low'){
   if(high)for(const z of [-.62,.62])cyl(body,steel,side*1.2,-.16,z,.06,.2,'x');
   // Flat bolted skirt panels hide the upper run; the front panel rakes up over the sprocket.
   for(let i=0;i<5;i++){const z=-1.45+i*.6;box(body,armor,side*1.57,-.08,z,.05,.52,high?.58:.6);if(high){box(body,track,side*1.57,-.365,z,.04,.06,.56);for(const dz of [-.2,.2])bolt(body,side*1.6,.12,z+dz);box(body,dark,side*1.596,-.08,z+.29,.008,.5,.012);}}
-  const nose=box(body,armor,side*1.55,-.1,1.52,.05,.34,.5);nose.rotation.x=.35;
+  const rake=new THREE.Shape([new THREE.Vector2(1.25,-.34),new THREE.Vector2(1.45,-.34),new THREE.Vector2(1.72,-.02),new THREE.Vector2(1.72,.18),new THREE.Vector2(1.25,.18)]);const front=new THREE.ExtrudeGeometry(rake,{depth:.05,bevelEnabled:false});front.rotateY(-Math.PI/2);add(body,front,armor,side*1.57+.025);
+  if(high){box(body,track,side*1.57,-.18,1.585,.04,.05,.42).rotation.x=-.87;for(const [dz,y] of [[1.38,.12],[1.62,.12],[1.36,-.26]])bolt(body,side*1.6,y,dz);box(body,dark,side*1.596,-.08,1.245,.008,.5,.012);}
   // LED running-light slits, towing shackles and rear tail lights.
-  box(body,led,side*.78,-.07,1.985,.3,.026,.02);box(body,led,side*.84,-.12,1.985,.16,.018,.02);
+  lamp(body,led,side*.78,-.07,1.975,.3,.026,1,high?6:1);lamp(body,led,side*.84,-.125,1.975,.16,.018,1,high?4:1);
   box(body,steel,side*.36,-.2,1.99,.1,.08,.06);ring(body,steel,side*.36,-.27,2.01,.055,.016,'x');
-  box(body,tail,side*1.1,.18,-1.96,.22,.03,.02);box(body,steel,side*.5,-.25,-1.97,.1,.08,.06);
+  lamp(body,tail,side*1.1,.18,-1.955,.22,.035,-1,high?5:1);box(body,steel,side*.5,-.25,-1.97,.1,.08,.06);
   // Crew hatches with periscope blocks on the front deck; unmanned turret carries no crew.
   const hatch=box(body,armor,side*.5,.47,1.1,.42,.04,.4);hatch.rotation.x=.05;
-  for(let k=0;k<3;k++){const scope=box(body,glass,side*(.38+k*.12),.44,1.36,.09,.05,.04);scope.rotation.x=.45;}
+  // Seated on the raked glacis: deck height falls from .47 at z=1.05 to .15 at z=1.72.
+  const glacisY=z=>.47-(z-1.05)*.478;
+  for(let k=0;k<3;k++){const x=side*(.38+k*.12),hood=box(body,armor,x,glacisY(1.3)+.025,1.3,.1,.06,.07);hood.rotation.x=.45;const scope=box(body,glass,x,glacisY(1.3)+.01,1.335,.078,.04,.012);scope.rotation.x=.45;}
   // Cooling louvres either side of the drone pad on the rear deck.
   box(body,dark,side*.74,.44,-1.45,.46,.02,.66);for(let k=0;k<(high?9:3);k++)box(body,steel,side*.74,.452,-1.72+k*.54/(high?8:2),.46,.018,.03);
   if(high){for(const z of [-1.4,-.8,-.2,.4,1])bolt(body,side*1.585,.21,z);rod(body,canvas,[side*1.08,.435,-1.05],[side*1.08,.435,-1.85],.02);box(body,steel,side*1.08,.435,-.95,.12,.03,.16);ring(body,steel,side*1.2,.39,-1.9,.04,.01,'z');}
  }
  // Rear exhaust louvre grille between the tail lights.
  box(body,dark,0,.05,-1.96,.9,.22,.02);for(let k=0;k<(high?7:3);k++)box(body,steel,0,-.03+k*.16/(high?6:2),-1.975,.88,.018,.02);
- if(high){for(const x of [-.95,.95])box(body,dark,0,.462,x>0?1.02:-.95,2.3,.006,.012);for(const x of [-.95,.95])box(body,dark,x,.458,-.4,.012,.006,2.8);box(body,glass,0,.46,1.55,.2,.03,.08).rotation.x=.45;}
+ if(high){for(const x of [-.95,.95])box(body,dark,0,.462,x>0?1.02:-.95,2.3,.006,.012);for(const x of [-.95,.95])box(body,dark,x,.458,-.4,.012,.006,2.8);box(body,armor,0,.47-(1.52-1.05)*.478+.02,1.52,.26,.05,.12).rotation.x=.45;box(body,glass,0,.47-(1.52-1.05)*.478+.02,1.582,.2,.03,.012).rotation.x=.45;}
  // Recon drone docked on its landing pad.
  cyl(body,dark,0,.472,-1.5,.26,.012);if(high)ring(body,paint,0,.48,-1.5,.21,.01,'y');
- const drone=new THREE.Group();drone.position.set(0,.5,-1.5);drone.rotation.y=.3;body.add(drone);box(drone,dark,0,.03,0,.2,.07,.24);
- for(const a of [Math.PI/4,-Math.PI/4]){const arm=box(drone,dark,0,.03,0,.5,.02,.035);arm.rotation.y=a;}
- for(const [x,z] of [[.177,.177],[-.177,.177],[.177,-.177],[-.177,-.177]]){cyl(drone,steel,x,.045,z,.025,.04);cyl(drone,dark,x,.07,z,.11,.004,'y',.11,high?20:8);}
- if(high){add(drone,new THREE.SphereGeometry(.035,12,8),glass,0,0,.12);for(const x of [-.07,.07])rod(drone,steel,[x,-.03,-.08],[x,-.03,.08],.008);box(drone,amber,0,.07,-.1,.03,.01,.02);}
- flatten(drone);
+ const docked=createDrone(materials.droneComposite||null),drone=docked.root;drone.scale.setScalar(.2);drone.position.set(0,.573,-1.5);drone.rotation.y=.3;body.add(drone);
+ drone.traverse(o=>{if(o.isMesh&&o.material.transparent)o.visible=false;});for(const o of [...drone.children])if(!o.visible)drone.remove(o);
+ for(const rotor of docked.rotors){rotor.rotation.y=.4;flatten(rotor);}flatten(drone);
 
  // Low unmanned turret: faceted wedge with a short ammunition bustle.
  turret.position.set(0,.47,.05);turret.scale.set(1.12,1.1,1.1);body.add(turret);cyl(turret,dark,0,.02,0,.8,.14);cyl(turret,steel,0,.08,0,.76,.04);
- add(turret,loft([
+ const shell=add(turret,loft([
   section(-.95,.1,.45,[.55,.1],[.62,.22],[.58,.38],[.4,.44]),
   section(-.78,.06,.53,[.8,.06],[.92,.2],[.86,.42],[.6,.52]),
   section(.45,.06,.53,[.8,.06],[.92,.2],[.86,.42],[.6,.52]),
@@ -89,18 +100,23 @@ export function createKestrel(materials,enemy=false,detail='low'){
  else cyl(turret,glass,-.38,.69,-.15,.172,.06);
  box(turret,armor,.34,.6,.5,.28,.14,.26);box(turret,glass,.34,.6,.635,.2,.08,.012);if(high)box(turret,armor,.34,.68,.58,.3,.02,.14);
  // Telescoping sensor mast with a spherical electro-optic head.
- cyl(turret,armor,.5,.58,-.62,.1,.1);cyl(turret,steel,.5,.83,-.62,.055,.42);cyl(turret,steel,.5,1.13,-.62,.042,.24);add(turret,new THREE.SphereGeometry(.11,high?24:10,high?16:6),armor,.5,1.3,-.62);
- cyl(turret,glass,.5,1.32,-.52,.04,.02,'z');if(high){ring(turret,steel,.5,1.04,-.62,.058,.012,'y');for(const x of [-.055,.055])cyl(turret,glass,.5+x,1.27,-.525,.022,.02,'z');ring(turret,steel,.5,1.32,-.51,.045,.008);}
+ cyl(turret,armor,.5,.58,-.62,.1,.1);cyl(turret,steel,.5,.7,-.62,.055,.2);cyl(turret,steel,.5,.86,-.62,.042,.14);add(turret,new THREE.SphereGeometry(.11,high?24:10,high?16:6),armor,.5,.98,-.62);
+ cyl(turret,glass,.5,1.0,-.52,.04,.02,'z');if(high){ring(turret,steel,.5,.79,-.62,.058,.012,'y');for(const x of [-.055,.055])cyl(turret,glass,.5+x,.95,-.525,.022,.02,'z');ring(turret,steel,.5,1.0,-.51,.045,.008);}
  // Remote weapon station with coaxial optics and ammunition can.
- cyl(turret,steel,-.45,.57,-.62,.12,.08);box(turret,dark,-.45,.7,-.6,.16,.16,.26);cyl(turret,steel,-.45,.72,-.25,.02,.44,'z');box(turret,dark,-.58,.68,-.62,.08,.12,.16);box(turret,glass,-.36,.74,-.5,.06,.06,.06);
+ cyl(turret,steel,-.45,.57,-.62,.12,.08);box(turret,dark,-.45,.7,-.6,.16,.16,.26);cyl(turret,steel,-.45,.72,-.25,.02,.44,'z');box(turret,dark,-.58,.68,-.62,.08,.12,.16);box(turret,dark,-.36,.74,-.5,.06,.06,.06);box(turret,glass,-.36,.74,-.468,.046,.04,.006);
  if(high){cyl(turret,dark,-.45,.72,-.44,.03,.1,'z');cyl(turret,steel,-.45,.72,-.03,.028,.04,'z');rod(turret,dark,[-.54,.66,-.62],[-.5,.62,-.62],.02);}
  for(const side of [-1,1]){
   // Hard-kill active protection launchers angled outward and forward.
-  const aps=new THREE.Group();aps.position.set(side*.72,.6,.3);aps.rotation.y=-side*.5;turret.add(aps);box(aps,armor,0,0,0,.2,.22,.22);
-  for(const dy of [-.05,.05])for(const dz of [-.05,.05]){cyl(aps,dark,side*.1,dy,dz,.035,.012,'x');if(high)ring(aps,steel,side*.104,dy,dz,.037,.007,'x');}
+  const aps=new THREE.Group();aps.position.set(side*.72,.6,.3);aps.rotation.y=-side*.5;turret.add(aps);box(aps,armor,-side*.02,0,0,.16,.22,.22);
+  const face=new THREE.Shape([new THREE.Vector2(-.11,-.11),new THREE.Vector2(.11,-.11),new THREE.Vector2(.11,.11),new THREE.Vector2(-.11,.11)]);for(const dy of [-.05,.05])for(const dz of [-.05,.05]){const h=new THREE.Path();h.absarc(dz,dy,.035,0,Math.PI*2,true);face.holes.push(h);}
+  const plate=new THREE.ExtrudeGeometry(face,{depth:.02,bevelEnabled:false,curveSegments:high?12:5});plate.rotateY(side*Math.PI/2);add(aps,plate,armor,side*.1-side*.02,0,0);
+  for(const dy of [-.05,.05])for(const dz of [-.05,.05]){const b=lathe(aps,bore,[[.035,0],[.035,-.09],[0,-.09]],side*.1,dy,dz,high?14:6);b.rotation.y=side*Math.PI/2;if(high)ring(aps,steel,side*.102,dy,dz,.037,.006,'x');}
   flatten(aps);
   // Flat radar tiles on the cheeks and laser warning receivers at each roof corner.
-  const radar=box(turret,dark,side*.72,.27,.72,.02,.12,.44);radar.rotation.y=-side*.67;
+  // Radar tile seated on the cheek: raycast the shell for the exact surface point and facet normal.
+  const hit=new THREE.Raycaster(new THREE.Vector3(side*1.4,.27,1.2),new THREE.Vector3(-side*.77,0,-.64).normalize()).intersectObject(new THREE.Mesh(shell.geometry,armor))[0];
+  if(hit){const n=hit.face.normal.clone(),v=new THREE.Vector3(0,1,0).addScaledVector(n,-n.y).normalize(),u=new THREE.Vector3().crossVectors(v,n),q=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(u,v,n));
+   const tile=(m,w,h,d)=>{const mesh=box(turret,m,0,0,0,w,h,d);mesh.position.copy(hit.point).addScaledVector(n,d/2);mesh.quaternion.copy(q);};tile(armor,.47,.15,.02);const glassTile=box(turret,radarFace,0,0,0,.44,.12,.008);glassTile.position.copy(hit.point).addScaledVector(n,.022);glassTile.quaternion.copy(q);}
   for(const [x,y,z] of [[.66,.53,.42],[.5,.5,-.8]]){add(turret,new THREE.CylinderGeometry(0,.07,.1,4),armor,side*x,y+.05,z);if(high){const lens=box(turret,amber,side*(x+.03),y+.04,z,.012,.03,.03);lens.rotation.z=side*.6;}}
   markings(turret,side,paint,box);
   if(high)for(const z of [-.7,.3])for(const y of [.12,.34])bolt(turret,side*(y<.2?.88:.9),y,z);
@@ -112,13 +128,13 @@ export function createKestrel(materials,enemy=false,detail='low'){
 
  // Narrow mantlet, long slim gun with segmented thermal sleeve and a multi-baffle muzzle brake.
  gun.position.set(0,.28,.9);turret.add(gun);box(gun,armor,0,0,.04,.36,.28,.36);cyl(gun,steel,0,0,.3,.12,.18,'z');
- cyl(gun,armor,0,0,1.3,.066,1.9,'z',.058);cyl(gun,dark,.24,-.02,.35,.025,.3,'z');
+ lathe(gun,armor,[[0,.35],[.066,.35],[.058,2.24],[.075,2.24],[.075,2.36],[.032,2.36]]);lathe(gun,bore,[[.032,2.36],[.032,1.2],[0,1.2]]);cyl(gun,dark,.24,-.02,.35,.025,.3,'z');
  if(high){for(let k=0;k<4;k++){cyl(gun,dark,0,0,.62+k*.36,.079,.31,'z');ring(gun,steel,0,0,.79+k*.36,.074,.012);}box(gun,steel,0,.1,2.2,.05,.04,.08);for(const s of [-1,1])for(const y of [-.09,.09])bolt(gun,s*.18,y,.2);}
  else cyl(gun,dark,0,0,1.15,.079,1.4,'z');
- cyl(gun,steel,0,0,2.3,.075,.12,'z');
- if(high){for(const z of [2.35,2.43,2.51])box(gun,steel,0,0,z,.24,.17,.035);for(const s of [-1,1])box(gun,steel,0,s*.075,2.43,.24,.02,.2);}
- else box(gun,steel,0,0,2.43,.22,.16,.2);
- cyl(gun,dark,0,0,2.531,.045,.01,'z');
+ // Multi-baffle brake: each baffle is a plate with a real bore hole; the sides stay open between them.
+ const baffle=new THREE.Shape([new THREE.Vector2(-.12,-.085),new THREE.Vector2(.12,-.085),new THREE.Vector2(.12,.085),new THREE.Vector2(-.12,.085)]),boreHole=new THREE.Path();boreHole.absarc(0,0,.04,0,Math.PI*2,true);baffle.holes.push(boreHole);
+ for(const z of [2.36,2.44,2.52])add(gun,new THREE.ExtrudeGeometry(baffle,{depth:.035,bevelEnabled:high,bevelSize:.004,bevelThickness:.004,bevelSegments:1,curveSegments:high?16:6}),steel,0,0,z);
+ for(const s of [-1,1])box(gun,steel,0,s*.075,2.455,.24,.02,.19);
  const muzzlePoint=new THREE.Object3D();muzzlePoint.name='main-gun-muzzle';muzzlePoint.position.z=2.56;gun.add(muzzlePoint);
 
  batch(body,new Set([turret,...wheels]));batch(turret,new Set([gun]));batch(gun);

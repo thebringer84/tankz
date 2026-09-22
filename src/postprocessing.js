@@ -1,3 +1,4 @@
+import {MAP_SIZE} from './config.js';
 import * as THREE from 'three';
 import {AmbientOcclusion} from './ambient-occlusion.js';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
@@ -11,12 +12,13 @@ export class Presentation {
  constructor(game){
   this.game=game;const target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,depthTexture:new THREE.DepthTexture(1,1)});
   this.composer=new EffectComposer(game.renderer,target);this.composer.addPass(new RenderPass(game.scene,game.camera));
-  this.fog=new ShaderPass({uniforms:{tDiffuse:{value:null},depth:{value:null},visibility:{value:null},inverseProjection:{value:new THREE.Matrix4()},cameraWorld:{value:new THREE.Matrix4()},fogEnabled:{value:0},showroom:{value:0},texel:{value:new THREE.Vector2()}},vertexShader,fragmentShader:`
-   varying vec2 vUv;uniform sampler2D tDiffuse,depth,visibility;uniform mat4 inverseProjection,cameraWorld;uniform float fogEnabled,showroom;uniform vec2 texel;
+  this.fog=new ShaderPass({uniforms:{tDiffuse:{value:null},depth:{value:null},mapSize:{value:MAP_SIZE},visibility:{value:null},inverseProjection:{value:new THREE.Matrix4()},cameraWorld:{value:new THREE.Matrix4()},fogEnabled:{value:0},showroom:{value:0},texel:{value:new THREE.Vector2()}},vertexShader,fragmentShader:`
+   varying vec2 vUv;uniform sampler2D tDiffuse,depth,visibility;uniform mat4 inverseProjection,cameraWorld;uniform float fogEnabled,showroom,mapSize;uniform vec2 texel;
    void main(){vec4 color=texture2D(tDiffuse,vUv);float d=texture2D(depth,vUv).x;vec4 p=inverseProjection*vec4(vUv*2.-1.,d*2.-1.,1.);if(showroom>.5){float blur=smoothstep(17.,32.,-p.z/p.w)*showroom;vec4 soft=color*4.;
    for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++){if(x==0&&y==0)continue;soft+=texture2D(tDiffuse,vUv+vec2(float(x),float(y))*texel*2.5);}
-   color=mix(color,soft/12.,blur);}p=cameraWorld*(p/p.w);vec2 uv=(p.xz+110.)/220.;
-   float seen=texture2D(visibility,uv).r*.4;seen+=texture2D(visibility,uv+vec2(.006,0.)).r*.15;seen+=texture2D(visibility,uv-vec2(.006,0.)).r*.15;seen+=texture2D(visibility,uv+vec2(0.,.006)).r*.15;seen+=texture2D(visibility,uv-vec2(0.,.006)).r*.15;
+   color=mix(color,soft/12.,blur);}p=cameraWorld*(p/p.w);vec2 uv=(p.xz+mapSize*.5)/mapSize;
+   float seen=texture2D(visibility,uv).r*.4;seen+=texture2D(visibility,uv+vec2(1.32/mapSize,0.)).r*.15;seen+=texture2D(visibility,uv-vec2(1.32/mapSize,0.)).r*.15;seen+=texture2D(visibility,uv+vec2(0.,1.32/mapSize)).r*.15;seen+=texture2D(visibility,uv-vec2(0.,1.32/mapSize)).r*.15;
+   seen*=1.-smoothstep(.88,1.,max(abs(vUv.x*2.-1.),abs(vUv.y*2.-1.)));
    float fog=(1.-seen)*fogEnabled*step(d,.99999);color.rgb*=mix(vec3(1.),vec3(.40,.43,.49),fog);gl_FragColor=color;}`});
   const render=this.fog.render.bind(this.fog);this.fog.render=(renderer,write,read,...rest)=>{this.fog.uniforms.depth.value=read.depthTexture;this.fog.uniforms.texel.value.set(1/read.width,1/read.height);render(renderer,write,read,...rest);};this.composer.addPass(this.fog);
   this.ao=new AmbientOcclusion(game.scene,game.camera);this.composer.addPass(this.ao);

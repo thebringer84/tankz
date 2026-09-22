@@ -1,17 +1,16 @@
 import * as THREE from 'three';
 import {createBurningFlame} from './fire.js';
 export class WreckFires {
- constructor(game){this.game=game;this.items=[];this.lights=game.fx.lights.slice(-3).map(slot=>{slot.reserved=true;return slot.light;});}
+ constructor(game){this.game=game;this.items=[];this.lights=game.fx.lights.slice(-3).map(slot=>{slot.reserved=true;return slot.light;});this.pool=this.lights.map(light=>{const group=new THREE.Group();group.name='wreck-fire';group.visible=false;game.root.add(group);const flames=Array.from({length:3},(_,i)=>{const flame=createBurningFlame(game.textures.fireAtlas,i*.81);flame.geometry.scale(.8,.8,1);flame.position.set((i-1)*.3,.35,(i%2)*.5-.25);group.add(flame);return flame;});return {group,flames,light};});}
  start(target,burning=this.game.rand()<.6){
   if(this.items.some(item=>item.target===target))return;
   if(this.items.length>=3)this.remove(this.items[0]);
-  const group=new THREE.Group();group.name='wreck-fire';this.game.root.add(group);
-  const flames=[];if(burning)for(let i=0;i<3;i++){const flame=createBurningFlame(this.game.textures.fireAtlas,i*.81);flame.geometry.scale(.8,.8,1);flame.position.set((i-1)*.3,.35,(i%2)*.5-.25);group.add(flame);flames.push(flame);}
-  const light=this.lights.find(light=>!this.items.some(item=>item.light===light));
+  const slot=this.pool.find(slot=>!this.items.some(item=>item.group===slot.group)),{group,light}=slot,flames=burning?slot.flames:[];
+  group.visible=target.visibleToPlayer!==false;for(const flame of slot.flames){flame.visible=burning;flame.material.uniforms.intensity.value=burning?1:0;flame.material.uniforms.time.value=0;}
   const burn=burning?12+this.game.rand()*10:0;
   this.items.push({target,group,flames,light,burn,duration:burn+(burning?9:5),age:0,emission:0});
  }
- remove(item){item.light.intensity=0;item.group.removeFromParent();for(const flame of item.flames){flame.geometry.dispose();flame.material.dispose();}this.items.splice(this.items.indexOf(item),1);}
+ remove(item){item.light.intensity=0;item.group.visible=false;for(const flame of item.flames){flame.visible=false;flame.material.uniforms.intensity.value=0;}this.items.splice(this.items.indexOf(item),1);}
  update(dt){for(const item of [...this.items]){
   item.age+=dt;if(item.age>=item.duration){this.remove(item);continue;}
   item.group.position.copy(item.target.body.translation());item.group.visible=item.target.visibleToPlayer!==false;

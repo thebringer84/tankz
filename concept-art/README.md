@@ -15,6 +15,7 @@ Generated using the built-in image_gen tool. Exact prompts are in [PROMPTS.md](P
 7. [Terrain, cover, vehicles and effects reference](07-world-effects.png)
 8. [Kestrel scout vehicle design reference](08-kestrel-scout.png) (geometry reference for src/kestrel.js; the in-game hull is shortened to the Kestrel's compact footprint)
 9. [Marauder super-heavy vehicle design reference](09-marauder-heavy.png) (geometry reference for src/marauder.js)
+10. [Vanguard turnaround](10-vanguard-turnaround.png) (side, front, rear and top views generated from 02; geometry reference for src/vanguard.js)
 
 ## Direction and review notes
 

@@ -10,7 +10,7 @@ export function resolveDirectionalAim(game,cursor){
  game.aimBearing=bearing;let chosen=null,best=Infinity;
  const muzzle=game.muzzle(player).p;
  for(const enemy of [...game.tanks,...(game.soldiers||[])]){
-  if(!enemy.enemy||enemy.dead||(game.visibility&&!game.visibility.canSee(player,enemy)))continue;
+  if(!enemy.enemy||enemy.dead||enemy.visibleToPlayer===false||(game.visibility&&!game.visibility.canSee(player,enemy)))continue;
   const position=new THREE.Vector3().copy(enemy.body.translation()),delta=position.clone().sub(origin),range=Math.hypot(delta.x,delta.z);
   if(range<3||range>100)continue;
   const error=Math.abs(angleDelta(bearing,Math.atan2(delta.x,delta.z)));

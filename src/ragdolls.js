@@ -8,7 +8,7 @@ export class Ragdolls {
   if(this.items.length>=this.max)this.remove(this.items[0]);
   crew.root.updateWorldMatrix(true,true);
   const anchors=crew.links.map(([a,b,position])=>({a,b,world:crew.root.localToWorld(new THREE.Vector3(...position))}));
-  const item={parts:[],joints:[],links:[],age:0,crushed:false,runOver};const byName=new Map();
+  const item={removed:false,parts:[],joints:[],links:[],age:0,crushed:false,runOver};const byName=new Map();
   for(const source of crew.parts){
    const mesh=source.mesh,position=mesh.getWorldPosition(new THREE.Vector3()),rotation=mesh.getWorldQuaternion(new THREE.Quaternion()),scale=mesh.getWorldScale(new THREE.Vector3());
    const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(position.x,position.y,position.z).setRotation(rotation).setLinvel(velocity.x,velocity.y,velocity.z).setAngvel({x:velocity.z*.4,y:2,z:-velocity.x*.35}).setLinearDamping(.22).setAngularDamping(.8).setCcdEnabled(true));
@@ -18,8 +18,9 @@ export class Ragdolls {
   for(const link of anchors){const a=byName.get(link.a),b=byName.get(link.b);const local=(part)=>link.world.clone().sub(part.body.translation()).applyQuaternion(new THREE.Quaternion().copy(part.body.rotation()).invert());const joint=this.world.createImpulseJoint(RAPIER.JointData.spherical(local(a),local(b)),a.body,b.body,true);joint.setContactsEnabled(false);item.joints.push(joint);item.links.push({joint,a:link.a,b:link.b});}
   crew.root.visible=false;this.items.push(item);return item;
  }
- remove(item){for(const part of item.parts){this.world.removeRigidBody(part.body);part.mesh.removeFromParent();}const index=this.items.indexOf(item);if(index>=0)this.items.splice(index,1);}
+ remove(item){if(item.removed)return;item.removed=true;for(const part of item.parts){this.world.removeRigidBody(part.body);part.mesh.removeFromParent();}const index=this.items.indexOf(item);if(index>=0)this.items.splice(index,1);}
  dismember(item,yaw,scale,launch=new THREE.Vector3()){
+  if(item.removed)return;
   const torso=item.parts[0].body.translation();this.fx.smear(new THREE.Vector3(torso.x,terrainHeight(torso.x,torso.z),torso.z),yaw,scale);
   const patterns=[
    [['torso','pelvis'],['head'],['upperArmL','forearmL'],['upperArmR','forearmR'],['thighL','shinL'],['thighR','shinR']],
@@ -30,14 +31,16 @@ export class Ragdolls {
   const pattern=(this.lastPattern+1+Math.floor(this.rand()*(patterns.length-1)))%patterns.length;this.lastPattern=pattern;const groups=patterns[pattern].map(names=>names.filter(name=>item.parts.some(p=>p.name===name))).filter(names=>names.length);
   this.fx.bloodBurst?.(new THREE.Vector3().copy(torso),launch,scale);
   for(const link of item.links||[])if(!groups.some(names=>names.includes(link.a)&&names.includes(link.b)))this.world.removeImpulseJoint(link.joint,true);
-  this.items.splice(this.items.indexOf(item),1);item.crushed=true;
+  this.items.splice(this.items.indexOf(item),1);item.crushed=true;item.removed=true;
   groups.forEach((names,index)=>{const parts=item.parts.filter(p=>names.includes(p.name)),links=item.links.filter(l=>names.includes(l.a)&&names.includes(l.b));const a=yaw+index*Math.PI*2/groups.length+(this.rand()-.5)*1.2,speed=2.5+this.rand()*3.5,lift=2.2+this.rand()*3.3,spin=new THREE.Vector3((this.rand()-.5)*15,(this.rand()-.5)*15,(this.rand()-.5)*15);
    for(const part of parts){part.body.resetForces(true);part.body.setLinvel({x:launch.x+Math.sin(a)*speed,y:launch.y+lift,z:launch.z+Math.cos(a)*speed},true);part.body.setAngvel(spin,true);}
-   while(this.items.length>=this.max)this.remove(this.items[0]);this.items.push({parts,joints:links.map(l=>l.joint),links,age:0,limb:true,pattern,bleedTimer:this.rand()*.12,bleedDuration:.7+this.rand()*.8,landed:false,crushed:false,runOver:null});
+   while(this.items.length>=this.max)this.remove(this.items[0]);this.items.push({removed:false,parts,joints:links.map(l=>l.joint),links,age:0,limb:true,pattern,bleedTimer:this.rand()*.12,bleedDuration:.7+this.rand()*.8,landed:false,crushed:false,runOver:null});
   });
  }
  update(dt,tank){
-  for(const item of [...this.items]){item.age+=dt;for(const part of item.parts){part.mesh.position.copy(part.body.translation());part.mesh.quaternion.copy(part.body.rotation());}
+  // Splitting an earlier item can evict later entries from this snapshot.
+  // Their Rapier bodies are already freed; never touch them again.
+  for(const item of [...this.items]){if(item.removed)continue;item.age+=dt;for(const part of item.parts){part.mesh.position.copy(part.body.translation());part.mesh.quaternion.copy(part.body.rotation());}
    const torso=item.parts[0].body.translation();
    if(item.limb){
     if(item.age<item.bleedDuration){item.bleedTimer-=dt;if(item.bleedTimer<=0){item.bleedTimer=.10+this.rand()*.09;this.fx.bloodTrail?.(new THREE.Vector3().copy(torso),new THREE.Vector3().copy(item.parts[0].body.linvel()));}}

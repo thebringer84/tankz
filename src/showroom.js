@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import {createBurningFlame} from './fire.js';
-import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {RectAreaLightUniformsLib} from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
+export const SHOWROOM_PLATFORM_HEIGHT=.3;
+
 export function buildShowroom(game){
- RectAreaLightUniformsLib.init();const root=new THREE.Group();root.name='industrial-showroom';const tank=game.player.root.position;root.position.set(tank.x,tank.y-.99*game.player.cfg.scale,tank.z);game.root.add(root);
+ RectAreaLightUniformsLib.init();const root=new THREE.Group();root.name='industrial-showroom';const tank=game.player.root.position;root.position.set(tank.x,tank.y-.99*game.player.cfg.scale-SHOWROOM_PLATFORM_HEIGHT,tank.z);game.root.add(root);
  const materials=game.materials,texture=game.textures.concrete.clone();texture.repeat.set(5,5);texture.needsUpdate=true;
  const concrete=new THREE.MeshStandardMaterial({map:texture,color:0x6e7067,roughness:.72,metalness:.05});
  const wall=new THREE.MeshStandardMaterial({map:game.textures.concrete,color:0x55564d,roughness:.92});
@@ -17,9 +18,21 @@ export function buildShowroom(game){
  const beam=(a,b,width=.13)=>{const va=new THREE.Vector3(...a),vb=new THREE.Vector3(...b),delta=vb.sub(va);const m=box(iron,0,0,0,width,delta.length(),width);m.position.copy(va).addScaledVector(delta,.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());};
  const floor=box(concrete,0,-.12,0,25,.24,27);floor.name='service-bay-floor';
  for(let x=-10;x<=10;x+=3)box(rubber,x,.004,0,.012,.005,25);for(let z=-12;z<=12;z+=3)box(rubber,0,.004,z,24,.005,.012);
- // Paint and recessed steel grating define a real service bay beneath the tank.
- for(const side of [-1,1]){box(yellow,side*2.35,.009,0,.045,.012,6.6);box(iron,side*2.72,.012,.2,.32,.02,6);for(let z=-2.65;z<3;z+=.18)box(rubber,side*2.72,.027,z,.28,.012,.06);}
- for(const z of [-3.3,3.3])for(let x=-2.3;x<2.3;x+=.3){const stripe=box(yellow,x,.012,z,.12,.016,.36);stripe.rotation.y=-.55;}
+ // Fixed pit ring, rotating deck and illuminated index marks frame every vehicle size.
+ const baseMetal=new THREE.MeshStandardMaterial({color:0x242d2b,roughness:.55,metalness:.78});
+ const deckMetal=new THREE.MeshStandardMaterial({map:game.textures.armor,color:0x70796d,roughness:.67,metalness:.55});
+ const rimLight=new THREE.MeshStandardMaterial({color:0xf1bd68,emissive:0xb6772c,emissiveIntensity:1.25,roughness:.4,metalness:.35});
+ const platformCylinder=(radius,height,y,material,parent=root,segments=96)=>{const mesh=add(new THREE.CylinderGeometry(radius,radius,height,segments),material,0,y,0,parent);mesh.name='turntable-deck';return mesh;};
+ platformCylinder(3.68,.1,.05,baseMetal);platformCylinder(3.55,.065,.135,iron);
+ const turntable=new THREE.Group();turntable.name='vehicle-turntable';root.add(turntable);root.userData.turntable=turntable;
+ platformCylinder(3.46,.19,.205,deckMetal,turntable);
+ platformCylinder(2.87,.012,.307,iron,turntable);
+ platformCylinder(2.73,.009,.318,deckMetal,turntable);
+ const deckRim=add(new THREE.TorusGeometry(3.47,.027,8,128),rimLight,0,.306,0,turntable);deckRim.rotation.x=Math.PI/2;deckRim.castShadow=false;
+ const innerRim=add(new THREE.TorusGeometry(2.83,.018,6,128),yellow,0,.318,0,turntable);innerRim.rotation.x=Math.PI/2;innerRim.castShadow=false;
+ for(let i=0;i<48;i++){const angle=i*Math.PI*2/48,x=Math.sin(angle)*3.21,z=Math.cos(angle)*3.21;const mark=box(i%4===0?rimLight:yellow,x,.311,z,i%4===0?.085:.045,.012,i%4===0?.23:.12,turntable);mark.rotation.y=angle;mark.castShadow=false;} for(let i=0;i<24;i++){const angle=i*Math.PI*2/24,x=Math.sin(angle)*3.38,z=Math.cos(angle)*3.38;const bolt=add(new THREE.CylinderGeometry(.027,.027,.018,8),iron,x,.317,z,turntable);bolt.castShadow=false;}
+ for(const side of [-1,1]){box(yellow,side*4.2,.009,0,.045,.012,8);box(iron,side*4.55,.012,.2,.32,.02,7);for(let z=-3.35;z<3.5;z+=.2)box(rubber,side*4.55,.027,z,.28,.012,.065);}
+ for(const z of [-4.15,4.15])for(let x=-3.8;x<3.8;x+=.36){const stripe=box(yellow,x,.012,z,.13,.016,.36);stripe.rotation.y=-.55;}
  // Rear hangar door opens onto bright desert, framed by corrugated steel and girders.
  box(wall,5.9,3.7,7,7.2,7.4,.3);box(wall,-9,3.7,7,2,7.4,.3);box(iron,-3.2,6.8,7,9.4,1,.45);
  box(wall,-10,3.8,0,.3,7.6,14);box(wall,10,3.8,0,.3,7.6,14);
@@ -58,8 +71,8 @@ export function buildShowroom(game){
   const flames=[];for(let i=0;i<4;i++){const flame=createBurningFlame(game.textures.fireAtlas,i*.67);flame.position.set(x+Math.sin(i*2.4)*.35,.16+(i%2)*.12,z+Math.cos(i*2.4)*.28);root.add(flame);flames.push(flame);}
   fires.push({position:new THREE.Vector3(x,.8,z).add(root.position),light,flames});
  }
- let emission=0,age=0;
- root.userData.update=dt=>{age+=dt;emission+=dt;for(const fire of fires){fire.light.intensity=55+Math.sin(age*17)*8+Math.sin(age*29)*6;fire.flames.forEach(flame=>{flame.material.uniforms.time.value=age;});}
+ let emission=0,age=0,spin=0;
+ root.userData.update=dt=>{age+=dt;emission+=dt;if(!matchMedia('(prefers-reduced-motion: reduce)').matches){spin=(spin+dt*.12)%(Math.PI*2);turntable.rotation.y=spin;game.player.root.rotation.set(0,Math.PI+spin,0);}for(const fire of fires){fire.light.intensity=55+Math.sin(age*17)*8+Math.sin(age*29)*6;fire.flames.forEach(flame=>{flame.material.uniforms.time.value=age;});}
 
   // A showroom Marauder idles with a thin plume from each stack.
   if(game.player.exhausts&&game.fx.rand()<dt*6){game.player.root.updateMatrixWorld();for(const e of game.player.exhausts)game.fx.emit(e.getWorldPosition(new THREE.Vector3()),new THREE.Vector3(0,1.2,-.2),0x3b3935,.25,2.4,'smoke');}
@@ -73,11 +86,6 @@ export function buildShowroom(game){
  // Soft-edged oil and dust deposits break up the clean concrete.
  const stainMaterial=new THREE.ShaderMaterial({transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'varying vec2 vUv;void main(){float r=length(vUv-.5)*2.;float noise=sin(vUv.x*43.)*sin(vUv.y*37.);gl_FragColor=vec4(.035,.029,.021,(1.-smoothstep(.25,.95,r+noise*.055))*.32);}' });
  for(let i=0;i<18;i++){const stain=add(new THREE.PlaneGeometry(1,1),stainMaterial,Math.sin(i*13.1)*6,.018,Math.cos(i*8.3)*5);stain.rotation.x=-Math.PI/2;stain.scale.set(1+(i%4)*.7,.6+(i%3)*.4,1);stain.castShadow=stain.receiveShadow=false;}
- // Workshop storage and maintenance props stay around the edges of the composition.
- const crate=(x,z,w=1.1,h=.75)=>{const m=add(new RoundedBoxGeometry(w,h,.75,1,.035),rusty,x,h/2,z);for(const side of [-1,1])box(iron,x+side*w*.3,h/2,z,.035,h+.02,.77);box(iron,x,h+.02,z,w+.02,.035,.77);return m;};
- crate(-5.8,3.5);crate(-6.8,4.4,1.3,.85);crate(-5.3,4.55,.9,.6);crate(5,4.1);crate(6.3,4.3,1.4,.75);
- for(const [x,z] of [[5.8,2.2],[6.8,2.55],[-6,5.5]]){cylinder(rusty,x,.65,z,.42,1.3);for(const y of [.1,.4,1,1.25])cylinder(iron,x,y,z,.432,.035);cylinder(iron,x+.16,1.315,z,.065,.022);}
- box(iron,6.1,1.45,-.15,3.2,.13,1.1);for(const x of [4.7,7.5])for(const z of [-.56,.25])box(iron,x,.7,z,.1,1.4,.1);for(let i=0;i<5;i++)box(rusty,5+i*.42,1.6,-.15,.18,.15,.32);
  // Stencilled fabric banner and bay designation echo the approved concept.
  const sign=(text,w,h,x,y,z)=>{const canvas=document.createElement('canvas');canvas.width=512;canvas.height=768;const c=canvas.getContext('2d');c.fillStyle='#343a30';c.fillRect(0,0,512,768);c.strokeStyle='#9a9573';c.lineWidth=4;c.strokeRect(24,24,464,720);c.fillStyle='#c8c0a0';c.textAlign='center';c.font='bold 85px Impact, sans-serif';text.split('\n').forEach((line,i)=>c.fillText(line,256,240+i*115));c.font='22px monospace';c.fillText('DUSTLINE / FIELD WORKS',256,690);for(let i=0;i<1000;i++){c.fillStyle=i%2?'#20291e35':'#b1a58a20';c.fillRect((i*137)%512,(i*227)%768,2+(i%9),1+(i%3));}const t=new THREE.CanvasTexture(canvas);t.colorSpace=THREE.SRGBColorSpace;const m=add(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:t,roughness:1,side:THREE.DoubleSide}),x,y,z);m.castShadow=false;m.rotation.y=Math.PI;return m;};
  sign('BUILT\nTO\nENDURE.',2.1,3.3,5.3,3.5,6.55);sign('BAY\n023',1.1,1.5,-8.85,3.3,6.5);

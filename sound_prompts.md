@@ -70,7 +70,7 @@ These are production prompts for audio generation or recording, not audio files 
 
 ### jeep_explosion_reference_mix — 3 variants, 4–5 seconds, mono
 
-**Prompt:** A reference mix of a small military jeep exploding, followed almost immediately by two different adult soldiers' brief shocked ejection yells and a scattering of tumbling metal. Concussive fuel ignition first; the voices are shorter and quieter than the blast; wheel and panel impacts follow after a small delay. Gritty stylized desert combat, no music, no intelligible dialogue, no prolonged screams. This is an audition reference only; deliver the explosion, voices and debris as separate stems as well.
+**Prompt:** A reference mix of a small military jeep exploding, followed almost immediately by two different adult soldiers' brief shocked ejection yells and a scattering of tumbling metal. Concussive fuel ignition first; the voices are shorter and quieter than the blast; wheel and panel impacts follow after a small delay. Gritty stylized armored combat, no music, no intelligible dialogue, no prolonged screams. This is an audition reference only; deliver the explosion, voices and debris as separate stems as well.
 
 ### tank_explosion — 5 variants, 4–6 seconds, mono
 
@@ -230,7 +230,7 @@ All music must be original, with no recognizable existing melody, named-artist i
 
 ### combat_high_intensity_layer — 64 bars, stereo loop, 112 BPM
 
-**Prompt:** An original additive high-intensity layer for an existing 112 BPM industrial desert combat groove. Tight urgent percussion, distorted rhythmic guitar stabs, metallic accents and a controlled rising bass texture. Exciting, heavy and playful enough for tank jumps and explosions. No lead melody that clashes with a sparse minor-key base, no vocals, no full-song intro or ending. Exactly 64 bars, seamless loop, and restrained sub-bass so cannon impacts stay dominant. Deliver percussion and texture stems separately.
+**Prompt:** An original additive high-intensity layer for an existing 112 BPM industrial armored combat groove. Tight urgent percussion, distorted rhythmic guitar stabs, metallic accents and a controlled rising bass texture. Exciting, heavy and playful enough for tank jumps and explosions. No lead melody that clashes with a sparse minor-key base, no vocals, no full-song intro or ending. Exactly 64 bars, seamless loop, and restrained sub-bass so cannon impacts stay dominant. Deliver percussion and texture stems separately.
 
 ### combat_transition_riser — 2 bars, 112 BPM, stereo
 

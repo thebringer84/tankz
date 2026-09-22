@@ -10,7 +10,21 @@ import {Ragdolls} from '../src/ragdolls.js';
 import {Visibility} from '../src/visibility.js';
 await RAPIER.init();
 function setup(){const g=Object.create(Game.prototype);Object.assign(g,{time:0,world:new RAPIER.World({x:0,y:-18,z:0}),root:new THREE.Group(),materials:makeMaterials({sand:null,normal:null,height:null,armor:null,concrete:null,rock:null}),tanks:[],soldiers:[],props:[],entities:new Map(),nextId:1,rand:()=>.5,shells:[],fx:{smear(){g.smears++;},muzzle(){}},audio:{boom(){}},smears:0});g.world.createCollider(RAPIER.ColliderDesc.cuboid(150,.2,150).setTranslation(0,-.2,0));g.player=g.spawnTank('medium',0,0,false);g.ragdolls=new Ragdolls(g.world,g.root,g.fx);g.infantry=new Infantry(g);g.visibility=new Visibility(g);g.world.step();return g;}
-test('deployment includes lone patrols and squads of four through eight',()=>{const g=setup();g.infantry.deploy();assert.deepEqual(g.infantry.squads.map(s=>s.members.length),[1,1,4,6,8]);assert.equal(g.soldiers.length,20);assert.ok(g.soldiers.every(s=>s.crew.parts.length===11&&s.muzzlePoint));g.world.free();});
+test('running over a crowd safely evicts ragdolls during the same update',()=>{
+ const g=setup();
+ try{
+  for(let i=0;i<g.ragdolls.max;i++){
+   const s=g.infantry.spawn(-45+i*3,25);assert.ok(s);
+   const p=s.body.translation();g.player.body.setTranslation(p,true);g.player.grounded=6;g.player.speed=10;g.infantry.sync();assert.equal(s.dead,true);
+  }
+  assert.equal(g.ragdolls.items.length,g.ragdolls.max);
+  for(const item of g.ragdolls.items)item.age=.9;
+  g.player.speed=0;
+  for(let i=0;i<90;i++){g.world.step();g.ragdolls.update(1/60,g.player);assert.ok(g.ragdolls.items.length<=g.ragdolls.max);}
+  assert.ok(g.smears>0);assert.ok(g.ragdolls.items.every(item=>item.parts.every(part=>part.body.isValid())));
+ }finally{g.world.free();}
+});
+test('deployment populates 250 infantry in 25 roaming squads',()=>{const g=setup();g.infantry.deploy();assert.deepEqual(g.infantry.squads.map(s=>s.members.length),Array(25).fill(10));assert.equal(g.soldiers.length,250);assert.ok(g.soldiers.every(s=>s.crew.parts.length===11&&s.muzzlePoint));g.world.free();});
 test('infantry fires low-damage physical machine-gun rounds',()=>{const g=setup(),s=g.infantry.spawn(0,15);g.fire(s,true);assert.equal(g.shells.length,1);assert.ok(g.shells[0].damage<1);assert.ok(g.shells[0].body.isDynamic());assert.ok(s.secondary>0);g.world.free();});
 test('explosion launches jointed infantry ragdolls and cleans up live colliders',()=>{const g=setup(),s=g.infantry.spawn(0,15),p=new THREE.Vector3().copy(s.body.translation());g.infantry.blast(p.clone().add(new THREE.Vector3(1,0,0)),7,150);assert.ok(s.dead);assert.equal(g.entities.has(s.collider.handle),false);assert.equal(g.ragdolls.items.length,1);assert.equal(g.ragdolls.items[0].joints.length,10);assert.ok(g.ragdolls.items[0].parts[0].body.linvel().y>4);g.infantry.blast(p,7,150);assert.equal(g.ragdolls.items.length,1);g.world.free();});
 test('running over standing infantry first ragdolls beneath the tank, then produces one smear',()=>{const g=setup(),s=g.infantry.spawn(0,15),p=s.body.translation();g.player.body.setTranslation({x:p.x,y:p.y,z:p.z},true);g.player.grounded=6;g.player.speed=5;g.infantry.sync();g.infantry.sync();assert.ok(s.dead);assert.equal(g.smears,0);assert.equal(g.entities.has(s.collider.handle),false);assert.equal(g.ragdolls.items.length,1);assert.equal(g.ragdolls.items[0].parts.length,11);for(let i=0;i<12;i++){g.world.step();g.ragdolls.update(1/60,g.player);}assert.equal(g.smears,0,'ragdoll must remain visible before crushing');g.player.speed=0;for(let i=0;i<60;i++){g.world.step();g.ragdolls.update(1/60,g.player);}assert.equal(g.smears,1);assert.ok(g.ragdolls.items.length>=6&&g.ragdolls.items.length<=8);assert.ok(g.ragdolls.items.every(r=>r.limb));for(let i=0;i<150;i++){g.world.step();g.ragdolls.update(1/60,null);}const limb=g.ragdolls.items[0],lp=limb.parts[0].body.translation();g.player.body.setTranslation({x:lp.x,y:lp.y+.8,z:lp.z},true);g.player.grounded=6;g.player.speed=4;g.ragdolls.update(1/60,g.player);assert.ok(!g.ragdolls.items.includes(limb));assert.ok(g.smears>=2);g.world.free();});

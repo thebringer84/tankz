@@ -18,6 +18,139 @@ Input image is reference albedo game texture. Generate matching grayscale height
 
 Generate a square seamless tileable raw ALBEDO material texture of hand-painted worn olive drab military steel. Olive paint, subtle brush strokes, small chipped corners and exposed dull gray steel flecks, restrained reddish rust, fine scratches. Flat diffuse texture edge to edge, no directional lighting, shadows, perspective, objects, text, panels, bolts or borders. Gritty indie game 3D tank material; muted green-gray not bright green. Seamless all edges.
 
+## Vanguard medium tank: turnaround, armour, running gear, canvas, grime, decal and lamp lens
+
+Generated with the codex imagegen skill (built-in image_gen tool, one call per asset). The geometry reference is concept-art/02-garage-loadout.png, with 01 and 06 as supporting angles and concept-art/10-vanguard-turnaround.png, generated from 02, for the unseen rear and top. Used by src/vanguard.js.
+
+Map sets. `vanguard-armor-*` covers hull and turret and `vanguard-gear-*` covers tracks, wheels and fittings. In each set, bump, specular and roughness are imagegen edits of that set's albedo, passed as the reference image. The **normal maps are computed from the bump** (Sobel on a 1.1 px blur, wrap mode, OpenGL +Y), so colour and relief align exactly. Alignment check (high-pass correlation with the albedo; about 0.00 at a 40 px offset in every case):
+
+- armour: bump +0.40, specular +0.35, roughness +0.50
+- gear: bump +0.56, roughness +0.50. Gear specular is -0.09 against the albedo because mud and dust are bright in albedo but dull in specular. It is -0.29 against roughness, which is expected for shiny steel.
+
+Seams: each map in a set got the same mirrored edge cross-fade (56 px), taking wrap error from about 15 to 0. Grayscale data maps are stored as 8-bit L PNGs.
+
+Other assets:
+- `vanguard-canvas-bump/normal` are a high-pass of the canvas weave.
+- `vanguard-decal.png` has real alpha. The triangle sits left of u=0.469 and "217" right of it.
+- `vanguard-lens.png` is both the colour and emissive map for the headlamps, the marker and the red-tinted tail lamps.
+
+The running-gear set is shared by all three tanks. `gearMaterial` in src/tank-geometry.js builds tracks, tyres, hubs, hooks, lamp cages and other metal fittings from it on the Kestrel and the Marauder. The Kestrel's canvas uses the Vanguard canvas maps.
+
+Showroom materials use albedo, normal, roughness and specular (Physical). Gameplay uses albedo and bump. A shared weathering pass adds macro tone, cavity (showroom), chip metalness from the specular map, dust and mud driven by the grime mask and baked root-space height.
+
+### Turnaround (Image 1: concept 02)
+> Use case: stylized-concept
+> Asset type: production vehicle turnaround design sheet, landscape 3:2, used by a 3D modeller as the geometry reference.
+> Input images: Image 1 is the approved concept art; the tank in the centre (turret marked "217") is the exact design to reproduce. Keep every design element identical: boxy riveted cast-and-welded turret with faceted cheeks, box mantlet with round gun collar, long 76 mm gun with thickened muzzle, commander cupola, stowage bin on the turret rear side, sloped glacis with two headlamps in bar guards and a driver vision block, lower nose plate with two U tow shackles, angled front mud guards, full-length track guards with stowage boxes, five large rubber-tyred road wheels, raised front drive sprocket, rear idler, return rollers, cast steel link tracks, rear engine deck.
+> Primary request: the same tank drawn as four clean orthographic views arranged in a grid on a neutral warm-grey studio backdrop: LEFT SIDE view (top left), FRONT view (top right), REAR view (bottom right) and TOP-DOWN plan view (bottom left). Same scale in every view, aligned, no perspective distortion. Weathered olive drab paint as in the concept, "217" and the triangle emblem on the turret sides.
+> Style/medium: realistic painted 3D render, crisp readable forms and hardware.
+> Avoid: labels, dimension lines, text other than 217, humans, background scenery.
+
+### vanguard-armor-albedo.png (Image 1: concept 02)
+> Use case: stylized-concept
+> Asset type: tileable PBR ALBEDO texture for the hull and turret armour of a hero medium tank ("Vanguard") in a cinematic 3D desert tank game. It will be box-projected over large steel plates at roughly 2.2 metres per tile.
+> Input images: Image 1 is the approved concept art; use ONLY the tank's paint and weathering as the colour and wear reference (worn olive drab paint over cast and rolled steel).
+> Primary request: a square, full-bleed, perfectly seamless repeatable surface of battle-worn olive drab painted armour steel matching the concept tank. Base: muted olive-drab green paint (not bright, not yellow-green), with broad soft tonal mottling between slightly darker grey-olive and faded dusty khaki-olive. Weathering: many small-to-medium irregular chipped paint flakes exposing dark gunmetal steel, some chips with thin lighter primer edges; fine speckled chipping; dry desert dust accumulating in soft patches; faint vertical rain/rust streaks in muted oxide brown; a few light scratches and scuffs; subtle cast-steel pitting texture in the paint. Density of wear similar to the concept: clearly battle worn but the olive paint still covers roughly 80 percent of the surface.
+> Style/medium: photoreal, cinema-grade material scan with a very slight hand-painted richness.
+> Composition/framing: straight-on orthographic flat material, uniform scale across the entire image, no focal object, no perspective.
+> Lighting: completely flat diffuse colour only; absolutely no directional light, highlights, cast shadows, ambient occlusion or vignette.
+> Constraints: must tile seamlessly on all four borders. Medium value, readable at a distance.
+> Avoid: tanks, panels, panel seams, bolts, rivets, welds, lettering, numbers, symbols, camouflage stripes, frames, borders, text, watermark.
+
+### vanguard-armor-bump.png (Image 1: the armour albedo)
+> Use case: precise-object-edit
+> Asset type: matching grayscale HEIGHT / BUMP map for a tileable PBR tank armour material.
+> Input images: Image 1 is the edit target: the tank armour ALBEDO texture. Transform it into its height map.
+> Primary request: convert the attached olive armour albedo into a strictly grayscale height map that aligns with it pixel for pixel. Preserve the exact position, shape and scale of every chipped paint flake, speckle, rust streak, scratch and pit. Intact painted steel is a flat medium-light grey (about 62 percent) with very fine low-amplitude paint and cast-steel grain noise; chipped flakes where the paint layer is missing are darker recesses (about 40 percent) with crisp raised paint-edge rims slightly brighter than the paint; scratches are thin dark grooves; rust streaks very slightly raised and rough; dust patches barely raised and soft.
+> Constraints: identical framing, square, full bleed, seamless tiling, no perspective. Strictly grayscale height data, not a photograph.
+> Avoid: colour, directional lighting, shading, shadows, ambient occlusion, text, labels, borders, previews.
+
+### vanguard-armor-specular.png (Image 1: the armour albedo)
+> Use case: precise-object-edit
+> Asset type: matching grayscale SPECULAR intensity map for a tileable PBR tank armour material.
+> Input images: Image 1 is the edit target: the tank armour ALBEDO texture. Transform it into its specular map.
+> Primary request: convert the attached olive armour albedo into a strictly grayscale specular-intensity map aligned pixel for pixel. Preserve the exact position, shape and scale of every chipped flake, speckle, rust streak, scratch and dust patch. Old matte olive paint is an even dark grey (about 30 percent) with subtle fine mottling; dust patches darker (about 18 percent); rust streaks very dark (about 12 percent); chipped flakes of exposed bare gunmetal steel and hairline scratches are bright (80 to 92 percent), with the thin primer rims mid grey.
+> Constraints: identical framing, square, full bleed, seamless tiling, no perspective. Strictly grayscale PBR data.
+> Avoid: colour, directional lighting, shading, shadows, text, labels, borders, previews.
+
+### vanguard-armor-roughness.png (Image 1: the armour albedo)
+> Use case: precise-object-edit
+> Asset type: matching grayscale ROUGHNESS map for a tileable PBR tank armour material.
+> Input images: Image 1 is the edit target: the tank armour ALBEDO texture. Transform it into its roughness map.
+> Primary request: convert the attached olive armour albedo into a strictly grayscale linear roughness map aligned pixel for pixel. Preserve the exact position, shape and scale of every chipped flake, speckle, rust streak, scratch and dust patch. Matte olive paint is light grey (about 76 percent) with subtle fine mottling; dust patches lighter (about 88 percent); rust streaks near white (92 percent); chipped flakes of exposed bare steel are dark grey (about 38 percent) and hairline scratches darker still (about 30 percent).
+> Constraints: identical framing, square, full bleed, seamless tiling, no perspective. Strictly grayscale linear PBR data.
+> Avoid: colour, directional lighting, shading, shadows, text, labels, borders, previews.
+
+### vanguard-gear-albedo.png (Image 1: concept 02)
+> Use case: stylized-concept
+> Asset type: tileable PBR ALBEDO texture for the running gear of a hero tank in a cinematic 3D desert tank game: cast manganese-steel track links, drive sprocket, idlers, road-wheel hubs, suspension arms, tow shackles and chains.
+> Input images: Image 1 is the approved concept art; use ONLY the tank's tracks and road wheels as the colour and wear reference.
+> Primary request: a square, full-bleed, perfectly seamless repeatable surface of heavily used dark cast steel: dark gunmetal grey-brown iron with fine cast-sand pitting, patchy orange-brown and dark umber rust bloom, traces of worn olive paint remnants in small patches, caked and dried pale desert dust and ochre mud clinging in clumps and smears, a few bright worn polished scuffs where metal rubs metal.
+> Style/medium: photoreal cinema-grade material scan.
+> Composition/framing: straight-on orthographic flat material, uniform scale, no focal object, no perspective.
+> Lighting: completely flat diffuse colour only; no directional light, highlights, cast shadows, ambient occlusion or vignette.
+> Constraints: must tile seamlessly on all four borders. Mid-dark overall value (not black).
+> Avoid: track links, bolts, rivets, objects, shapes, text, numbers, frames, borders, watermark.
+
+### vanguard-gear-bump.png, -specular.png, -roughness.png (Image 1: the gear albedo)
+> Use case: precise-object-edit
+> Asset type: matching grayscale HEIGHT / BUMP map for a tileable PBR cast-steel running-gear material (tank tracks, wheels, sprocket).
+> Input images: Image 1 is the edit target: the running-gear steel ALBEDO texture. Transform it into its height map.
+> Primary request: convert the attached rusty cast-steel albedo into a strictly grayscale height map aligned with it pixel for pixel. Preserve the exact position, shape and scale of every rust bloom, mud clump, pit, paint remnant and scuff. Bare cast steel is medium grey (about 50 percent) with fine sand-cast pitting noise; caked mud and dust clumps are raised and lumpy (65 to 85 percent); rust blooms slightly raised and flaky; olive paint remnants slightly raised with crisp edges; worn polished scuffs slightly lower and smooth.
+> Constraints: identical framing, square, full bleed, seamless tiling, no perspective. Strictly grayscale height data.
+> Avoid: colour, directional lighting, shading, shadows, ambient occlusion, text, labels, borders, previews.
+
+> Use case: precise-object-edit
+> Asset type: matching grayscale SPECULAR intensity map for a tileable PBR cast-steel running-gear material.
+> Input images: Image 1 is the edit target: the running-gear steel ALBEDO texture. Transform it into its specular map.
+> Primary request: convert the attached rusty cast-steel albedo into a strictly grayscale specular-intensity map aligned pixel for pixel. Preserve the exact position, shape and scale of every rust bloom, mud clump, pit, paint remnant and scuff. Dull dark bare cast steel is mid grey (about 55 percent); worn polished metal scuffs are bright (85 to 95 percent); rust blooms dark (15 percent); caked mud and dust very dark (8 percent); olive paint remnants dark grey (30 percent).
+> Constraints: identical framing, square, full bleed, seamless tiling, no perspective. Strictly grayscale PBR data.
+> Avoid: colour, directional lighting, shading, shadows, text, labels, borders, previews.
+
+> Use case: precise-object-edit
+> Asset type: matching grayscale ROUGHNESS map for a tileable PBR cast-steel running-gear material.
+> Input images: Image 1 is the edit target: the running-gear steel ALBEDO texture. Transform it into its roughness map.
+> Primary request: convert the attached rusty cast-steel albedo into a strictly grayscale linear roughness map aligned pixel for pixel. Preserve the exact position, shape and scale of every rust bloom, mud clump, pit, paint remnant and scuff. Bare cast steel medium grey (about 55 percent); worn polished scuffs dark (25 to 35 percent); rust blooms light (85 percent); caked mud and dust near white (93 percent); olive paint remnants light grey (75 percent).
+> Constraints: identical framing, square, full bleed, seamless tiling, no perspective. Strictly grayscale linear PBR data.
+> Avoid: colour, directional lighting, shading, shadows, text, labels, borders, previews.
+
+### vanguard-canvas-albedo.png (Image 1: concept 01)
+> Use case: stylized-concept
+> Asset type: tileable PBR ALBEDO texture for military canvas tarpaulins, bedrolls and stowage bags strapped to a tank.
+> Input images: Image 1 is the approved concept art; use ONLY the canvas bag / tarp on the tank's turret side as the colour reference.
+> Primary request: a square, full-bleed, perfectly seamless repeatable surface of heavy woven cotton duck canvas, faded olive-khaki with dusty lighter patches, visible fine basket weave, a few darker grease and oil stains, soft sun fading, desert dust ground into the fibres, slight fraying scuffs.
+> Style/medium: photoreal cinema-grade fabric material scan.
+> Composition/framing: straight-on orthographic flat material, uniform scale, weave running exactly horizontal and vertical, no folds, no wrinkles, no perspective.
+> Lighting: completely flat diffuse colour only; no directional light, highlights, shadows or ambient occlusion.
+> Constraints: must tile seamlessly on all four borders.
+> Avoid: folds, seams, straps, buckles, stitching lines, objects, text, frames, borders, watermark.
+
+### vanguard-grime-mask.png (Image 1: concept 06)
+> Use case: stylized-concept
+> Asset type: tileable grayscale GRIME MASK texture used by a shader to blend dried desert mud and dust onto the lower hull, tracks and wheels of a tank.
+> Input images: Image 1 is the approved concept art; use ONLY the dried mud and dust splattered over the tank's lower hull and track guards as the pattern reference.
+> Primary request: a square, full-bleed, perfectly seamless grayscale mask: black means clean surface, white means thick caked mud. Organic clumpy splatter kicked up by tracks, irregular dried mud patches with cracked edges, fine spray speckles, soft dusty smears and several vertical drip streaks running downward. Roughly 40 percent coverage with a full range of soft and hard edges.
+> Composition/framing: flat orthographic, uniform density across the frame, no focal object, no perspective.
+> Constraints: strictly grayscale mask data, seamless on all four borders.
+> Avoid: colour, lighting, shading, shadows, text, frames, borders, watermark.
+
+### vanguard-decal.png (Image 1: concept 02)
+> Use case: stylized-concept
+> Asset type: transparent-background paint stencil DECAL sprite for the turret side of a tank in a cinematic 3D game.
+> Input images: Image 1 is the approved concept art; match the white "217" number and the white triangle emblem painted on the tank's turret, including their worn, chipped, weathered look.
+> Primary request: a wide landscape image on a genuinely TRANSPARENT background containing exactly two painted markings side by side, left to right: (1) a bold white equilateral triangle emblem outline with a smaller solid white triangle cut into its lower centre (an upward delta chevron like the concept), and (2) the number "217" in bold condensed military stencil numerals. Text (verbatim): "217" — the digits two, one, seven. Off-white chalky military paint colour (#E9E4D2). The paint is heavily weathered: chipped, scratched, flaking with many small missing flecks and dusty worn edges so the steel below would show through; realistic hand-sprayed stencil edges with slight overspray.
+> Composition/framing: flat orthographic, markings fill most of the frame with generous transparent padding, both markings the same height, perfectly upright.
+> Constraints: transparent background alpha, the missing chips are transparent, no background colour.
+> Avoid: any other text or numbers, steel or olive background, shadows, perspective, frames, borders, watermark.
+
+### vanguard-lens.png
+> Use case: stylized-concept
+> Asset type: square texture for the round glass lens of a military vehicle headlamp, used as both the colour and emissive map on a flat disc in a cinematic 3D game.
+> Primary request: straight-on orthographic view of a round vintage military tank headlamp lens filling a square frame edge to edge: thick pressed glass with concentric Fresnel rings and a fine vertical prismatic flute pattern, a warm tungsten glow (pale cream-yellow core, warm amber toward the rim), subtle dust and grime specks on the glass, slight scratches, a thin dark metal retaining ring at the very edge of the circle. The corners outside the circle are pure black.
+> Composition/framing: perfectly centred circle touching the square edges, no perspective, flat.
+> Lighting: self-illuminated glowing lens only; no environment reflections, no lens flare, no bloom rays.
+> Avoid: text, logos, bulb filament close-up, housings, background scenery, frames, watermark.
+
 ## concrete-albedo.png
 
 Square tileable seamless raw game ALBEDO texture, worn pale gray beige military bunker concrete with hand painted surface, subtle chipped plaster and aggregate, fine hairline cracks, faint soot patches, neutral desaturated stone palette. Full image one flat diffuse material, no directional lighting or shading, NO large cracks holes bricks panels objects text border perspective. Gritty painterly indie tank game. Surface remains fairly light gray.
@@ -108,3 +241,36 @@ Saved asset: `public/assets/scenery-wood.png`. Generated with the built-in image
 
 Final prompt:
 > Use case: stylized-concept. Asset type: square seamless game surface texture, 1024x1024. Generate a flat orthographic albedo texture of weathered military shipping-crate wood: warm desaturated grey-brown rough timber, six broad parallel vertical boards, subtle hand-painted grain, worn edges, nail heads, small faded olive paint remnants and desert dust. Gritty indie military industrial art style. Fill the entire image edge to edge, tile seamlessly. No perspective, no object silhouette, no lighting gradients, no shadows, no text, no border. This will be mapped onto actual low-poly wooden crates and breakable barricades in a desert tank game.
+
+
+## Cannon muzzle plume
+
+`public/assets/cannon-muzzle-plume.png` — generated with the built-in imagegen tool using the imagegen skill; 1254 × 1254 RGBA with the generated alpha preserved. The exact prompt and research references are recorded in [docs/combat-presentation.md](docs/combat-presentation.md#generated-asset). Used by the pooled cannon flash shader.
+
+
+## Frontier sandstone — built-in imagegen
+
+Saved asset: `public/assets/frontier-sandstone.png`. Generated with the built-in image generation tool using the imagegen skill, copied into the project, and used as the albedo and subtle bump input for fractured stone ramps, boundary cliffs and low-poly terrain extensions. Geometry is authored in the game so its collisions match the visible surfaces.
+
+Final prompt:
+> Use case: stylized-concept. Asset type: seamless square tileable base-color texture for real-time low-poly desert sandstone boulders, natural stone jump ramps and distant mesa scenery in a tank driving game. Create a flat orthographic surface texture filling the entire square: weathered warm ochre sandstone, subtle horizontal sediment strata, chipped mineral edges, restrained charcoal hairline fissures and sandy dust in crevices. Broad quiet areas between fine details, natural varied rock grain, muted tan and dusty reddish brown matching a desert at late afternoon. Neutral diffuse illumination, no directional lighting or cast shadows, no perspective, no individual freestanding rocks, no objects, no sky, no text, no borders or watermark. Seamless matching edges, production-ready game albedo material, 1024 square.
+
+## Awareness border and enemy alert meter — built-in imagegen
+
+Saved assets: `public/assets/awareness-edge.png` and `public/assets/alert-chevron.png`. Generated using the imagegen skill and built-in image generation tool, copied into the project with the generated alpha preserved. The border is a tinted mask behind the HUD; the chevron repeats in the five-segment enemy alert meter. Text stays native HTML for clarity and accessibility.
+
+Final border prompt:
+> Use case: stylized-concept. Asset type: transparent widescreen 16:9 game HUD viewport-edge mask for a gritty desert tank game. Create ONLY a very restrained thin perimeter of white translucent windblown dust, fine etched scratches and faint analog sensor grain, fading inward smoothly. Concentrate detail in the four extreme corners and outermost 5 percent of each edge. Entire central 85 percent must be genuinely transparent and empty. All marks neutral white with varying alpha, suitable for tinting teal, amber or red by code. Elegant cinematic military optics, delicate uneven atmospheric edge treatment, no solid panels, no text, no symbols, no reticles, no glow across center, no black background, no checkerboard baked into the image, actual transparent alpha background. This image will overlay gameplay without obscuring the action.
+
+Final chevron prompt:
+> Use case: stylized-concept. Asset type: transparent game HUD glyph, one reusable illuminated segment for a five-level enemy alert meter in a gritty military tank game. A single bold upward pointing chevron, centered, crisp geometric silhouette with subtly chamfered corners, thick white metal arms, very fine distressed etched grain and one thin inset dark groove following the chevron. Neutral white and light grey only, no colored lighting. The chevron fills about 75 percent of the square with generous transparent padding. Actual transparent alpha background, no text, no numbers, no border, no drop shadow, no other icons, no black or checkerboard backdrop. Designed to remain clear at 22 pixels tall and to be tinted teal, amber or orange-red by the game. Output a square image.
+
+## Tank dust and recon drone
+
+Generated with the imagegen skill using the built-in image generation tool. Saved assets: `public/assets/tank-dust-billow.png` (alpha preserved) and `public/assets/recon-drone-composite.png`. The dust is tinted to the terrain in the particle shader; the drone material wraps actual beveled hull, arms and motor geometry. Recon square overlays use native CSS for crisp outlines and animation.
+
+Final dust prompt:
+> Use case: stylized-concept. Asset type: production real-time VFX particle texture, isolated suspended desert dust billow on actual transparent alpha background, square. A single broad low turbulent dust eddy seen obliquely from above, soft overlapping irregular lobes of fine powder, warm pale taupe and desaturated sandy beige, wispy feathered semi-transparent edges, subtle internal billowing density and fine variation, softly shaded volume under diffuse daylight. Dense but translucent interior with asymmetric curls; no sharp outlines or solid opaque chunks. Fill central 75 percent with generous fully transparent padding on all sides. Not a smoke column, no fire, no explosion, no ground plane, no vehicle, no scene, no debris, no cast shadow, no black or checkerboard baked into the background, no text. Designed for overlapping transparent particles forming a realistic broad tank dust wake from an aerial gameplay camera. Preserve a soft usable alpha falloff and faint wispy edges.
+
+Final drone prompt:
+> Use case: stylized-concept. Asset type: seamless tileable square albedo material for the physical 3D model of a compact rugged military reconnaissance quadcopter in a desert tank game. Flat orthographic macro surface of dark charcoal olive composite armor: fine subtle carbon fiber weave beneath worn matte ceramic paint, restrained olive-green panels of color variation, small dusty tan abrasions and micro scratches. Clean premium technical surface, realistic restrained fine details readable on a small flying drone. Even neutral diffuse illumination, no shadows or lighting gradients. Continuous material surface filling frame edge to edge; no drone object, no perspective, no panel borders, no text, no logos, no transparency, seamless on every edge. The game will map this texture onto beveled drone hull, rotor arms and motor housings.

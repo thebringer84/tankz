@@ -1,3 +1,4 @@
+import {RUIN_SITES,inJumpLane} from './world-layout.js';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {box,cylinder} from './models.js';
@@ -19,7 +20,8 @@ export class Scenery {
   const body=g.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x,y,z).setRotation(mesh.quaternion).setLinearDamping(.6).setAngularDamping(1.5));const collider=g.world.createCollider(RAPIER.ColliderDesc.cuboid(w/2,h/2,d/2).setMass(cfg.mass).setFriction(.65),body);
   const prop={id:`scenery-${g.nextId++}`,scenery:true,kind:type,mesh,body,collider,hp:cfg.hp,maxHp:cfg.hp,dynamic:true,destroyed:false,crushed:false};this.items.push(prop);g.props.push(prop);g.entities.set(collider.handle,prop);g.root.add(mesh);return prop;
  }
- deploy(){for(const [type,x,z,yaw] of [['car',-10,21,.3],['crate',-5,12,0],['barricade',2,8,.1],['fuel',13,16,-.3],['generator',8,28,.4]])this.spawn(type,x,z,yaw);for(const [x,z] of [[-26,-23],[26,-39],[47,39],[-47,43]])for(const [i,type] of Object.keys(TYPES).entries())this.spawn(type,x+(i%3)*5,z+Math.floor(i/3)*6,i*.7);}
+ deploy(){for(const [x,z] of RUIN_SITES)for(const [i,type] of Object.keys(TYPES).entries()){const px=x+12+(i%3)*6,pz=z+Math.floor(i/3)*7;if(!inJumpLane(px,pz,4))this.spawn(type,px,pz,i*.7);}}
+
  update(dt){const g=this.game;for(const prop of this.items){if(prop.destroyed)continue;for(const tank of g.tanks){if(tank.dead||tank.jeep||Math.abs(tank.speed)<.6)continue;const p=prop.body.translation(),t=tank.body.translation();if(Math.hypot(p.x-t.x,p.z-t.z)>6)continue;let contact=false;g.world.contactPair(prop.collider,tank.collider,manifold=>{for(let i=0;i<manifold.numContacts();i++)if(manifold.contactDist(i)<.12)contact=true;});if(contact)g.hurt(prop,dt*(220+Math.abs(tank.speed)*100),tank);if(prop.destroyed)break;}}}
  destroy(prop,owner){const g=this.game,p=new THREE.Vector3().copy(prop.body.translation());prop.destroyed=true;prop.mesh.updateWorldMatrix(true,true);
   if(prop.kind==='car'){prop.crushed=true;prop.mesh.scale.y=.28;const pts=[];for(const [w,d,y] of [[1.12,2.15,-.20],[.7,1.4,.20]])for(const x of [-1,1])for(const z of [-1,1])pts.push(x*w,y,z*d);prop.collider.setShape(RAPIER.ColliderDesc.convexHull(new Float32Array(pts)).shape);prop.collider.setFriction(.55);prop.body.wakeUp();g.spawnDebris(p,5,'metal');g.fx.smoke(p,false);}

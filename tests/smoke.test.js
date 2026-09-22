@@ -11,11 +11,11 @@ test('smoke sorts far to near and fades smoothly at birth and expiry',()=>{
  g.fx.update(.5);g.fx.prepare(camera);assert.ok(g.fx.points.geometry.attributes.aAlpha.getX(0)>0);
  for(let i=0;i<30;i++)g.fx.update(.1);assert.equal(g.fx.particles.length,0);
 });
-test('wreck fire follows its husk, fades to smolder, extinguishes and releases resources',()=>{
+test('wreck fire follows its husk, fades to smolder and returns to its pool',()=>{
  const g=setup(),fires=new WreckFires(g),p=new THREE.Vector3(2,1,3),target={body:{translation:()=>p},visibleToPlayer:true};
  fires.start(target,true);const item=fires.items[0];assert.equal(item.flames.length,3);fires.update(.2);p.x=7;fires.update(.2);assert.equal(item.group.position.x,7);
  for(let i=0;i<160;i++)fires.update(.1);assert.equal(item.flames[0].material.uniforms.intensity.value,0);assert.equal(item.light.intensity,0);assert.ok(g.fx.particles.length>0);
- for(let i=0;i<120;i++)fires.update(.1);assert.equal(fires.items.length,0);assert.equal(item.group.parent,null);
+ for(let i=0;i<120;i++)fires.update(.1);assert.equal(fires.items.length,0);assert.equal(item.group.visible,false);assert.ok(item.group.parent===g.root,'expired fire stays in the prepared pool');
 });
 test('non-burning wrecks only smolder briefly; fire sources are bounded and hidden wrecks do not emit',()=>{
  const g=setup(),fires=new WreckFires(g);g.rand=()=>.95;
@@ -27,7 +27,7 @@ test('screen smoke remains low and both emitters and particles expire',()=>{cons
 
 test('wreck ignition and extinction keep scene light count fixed and flash lights separate',()=>{const g=setup(),fires=new WreckFires(g),count=()=>{let n=0;g.root.traverse(o=>{if(o.isPointLight)n++;});return n;},before=count();fires.start({body:{translation:()=>new THREE.Vector3()},visibleToPlayer:true},true);fires.update(.2);const intensity=fires.items[0].light.intensity;g.fx.flash(new THREE.Vector3(),300,.2);g.fx.update(.01);assert.equal(fires.items[0].light.intensity,intensity);assert.equal(count(),before);fires.update(40);assert.equal(count(),before);});
 
-test('sand dust keeps one source per track, increases with speed and lingers near its origin',()=>{const slow=setup(),fast=setup(),p=new THREE.Vector3(0,1,0),side=new THREE.Vector3(1,0,0);slow.fx.dust(p,new THREE.Vector3(0,0,2),1,side);fast.fx.dust(p,new THREE.Vector3(0,0,14),1,side);assert.equal(fast.fx.particles.length,1);assert.equal(slow.fx.particles.length,1);const a=slow.fx.particles[0],b=fast.fx.particles[0];assert.ok(b.size>a.size);assert.ok(b.total>a.total);assert.ok(b.v.x>a.v.x);assert.ok(b.density>a.density);const initial=b.p.x;fast.fx.update(.5);assert.ok(b.p.x>initial);assert.ok(b.p.x<initial+.3);assert.ok(b.life>4);});
+test('sand dust keeps one source per track, increases with speed and lingers near its origin',()=>{const slow=setup(),fast=setup(),p=new THREE.Vector3(0,1,0),side=new THREE.Vector3(1,0,0);slow.fx.dust(p,new THREE.Vector3(0,0,2),1,side);fast.fx.dust(p,new THREE.Vector3(0,0,14),1,side);assert.equal(fast.fx.particles.length,1);assert.equal(slow.fx.particles.length,1);const a=slow.fx.particles[0],b=fast.fx.particles[0];assert.ok(b.size>a.size);assert.ok(b.total>a.total);assert.ok(b.v.x>a.v.x);assert.ok(b.density>a.density);const initial=b.p.x;fast.fx.update(.5);assert.ok(b.p.x>initial);assert.ok(b.p.x<initial+.7);assert.ok(b.life>4);});
 
 test('tank damage smoke grows denser and darker at 40, 30 and 20 percent health',()=>{const totals=[],colors=[];for(const ratio of [.41,.4,.3,.2]){const g=setup(),tank={hp:1000*ratio,cfg:{hp:1000,scale:1},root:new THREE.Group(),body:{linvel:()=>({x:0,y:0,z:0})}};for(let i=0;i<60;i++)g.fx.damageSmoke(tank,1/60);totals.push(g.fx.particles.length);colors.push(g.fx.particles[0]?.color.r??1);}assert.equal(totals[0],0);assert.ok(totals[1]>0&&totals[2]>totals[1]&&totals[3]>totals[2]);assert.ok(colors[1]>colors[2]&&colors[2]>colors[3]);});
 

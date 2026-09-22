@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {Navigation} from './navigation.js';
-import {angleDelta,clamp,terrainHeight} from './config.js';
+import {angleDelta,clamp,terrainHeight,MAP_HALF} from './config.js';
 export function createPatrol(t){const p=new THREE.Vector3().copy(t.body.translation());return {state:'patrol',home:p.clone(),goal:p.clone(),lastKnown:p.clone(),waypoint:0,noticed:0,lost:0,engaged:false,radioAt:Infinity,radioSent:false,search:0};}
 export class EnemyDirector {
  constructor(game){this.game=game;this.messages=[];this.transmissions=0;this.navigation=new Navigation(game);}
@@ -9,7 +9,7 @@ export class EnemyDirector {
   for(let i=this.messages.length-1;i>=0;i--){const m=this.messages[i];m.delay-=dt;if(m.delay>0)continue;this.messages.splice(i,1);if(m.recipient.dead)continue;const a=m.recipient.ai;if(a.state!=='pursue'){a.state='investigate';a.lastKnown.copy(m.position);a.search=0;}}
   for(const t of [...g.tanks,...(g.soldiers||[])]){if(!t.enemy||t.dead)continue;const a=t.ai;
    t.aiDt=dt;
-   const sees=g.visibility.canSee(t,g.player,58);a.sees=sees;
+   const sees=g.visibility.canSee(t,g.player);a.sees=sees;
    if(sees){a.lastKnown.copy(g.player.body.translation());a.lost=0;a.noticed+=dt;
     if(a.noticed>=.75){a.state='pursue';if(!a.engaged){a.engaged=true;a.radioAt=g.time+3;}}else if(a.state==='patrol')a.state='suspicious';
    }else {a.noticed=0;a.lost+=dt;if(a.state==='suspicious')a.state='patrol';if(a.state==='pursue')a.state='investigate';}
@@ -18,7 +18,7 @@ export class EnemyDirector {
   }
  }
  command(t){const g=this.game,a=t.ai,p=new THREE.Vector3().copy(t.body.translation());
-  if(a.state==='patrol'&&(p.distanceTo(a.goal)<6||!a.waypoint||a.needsWaypoint)){a.needsWaypoint=false;a.waypoint++;const angle=t.aiPhase+a.waypoint*1.7;a.goal.set(clamp(a.home.x+Math.sin(angle)*19,-95,95),0,clamp(a.home.z+Math.cos(angle)*19,-95,95));a.goal.y=terrainHeight(a.goal.x,a.goal.z)+1;this.navigation.refresh();const free=this.navigation.freeNear(this.navigation.index(a.goal));if(free>=0)a.goal.copy(this.navigation.point(free));}
+  if(a.state==='patrol'&&(p.distanceTo(a.goal)<6||!a.waypoint||a.needsWaypoint)){a.needsWaypoint=false;a.waypoint++;const angle=t.aiPhase+a.waypoint*1.7;a.goal.set(clamp(a.home.x+Math.sin(angle)*36,-MAP_HALF+16,MAP_HALF-16),0,clamp(a.home.z+Math.cos(angle)*36,-MAP_HALF+16,MAP_HALF-16));a.goal.y=terrainHeight(a.goal.x,a.goal.z)+1;this.navigation.refresh();const free=this.navigation.freeNear(this.navigation.index(a.goal));if(free>=0)a.goal.copy(this.navigation.point(free));}
   const target=a.state==='patrol'?a.goal:a.lastKnown,delta=target.clone().sub(p);
   const movement=this.navigation.steer(t,target,t.aiDt||1/60,a.state==='patrol'?.55:.8);
   if(a.state==='patrol'&&!t.navigation.path.length&&t.navigation.recovery<=0)a.needsWaypoint=true;

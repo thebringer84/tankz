@@ -16,7 +16,10 @@ export function createTank(type,materials,enemy=false,detail='low'){
 }
 export function makeMaterials(textures){
  return {
- armorNormal:textures.armorNormal||null,armorRoughness:textures.armorRoughness||null,
+ armorNormal:textures.armorNormal||null,armorRoughness:textures.armorRoughness||null,droneComposite:textures.droneComposite||null,
+ vanguard:{albedo:textures.vanguardAlbedo||textures.armor||null,normal:textures.vanguardNormal||null,roughness:textures.vanguardRoughness||null,specular:textures.vanguardSpecular||null,bump:textures.vanguardBump||null,
+  gearAlbedo:textures.vanguardGearAlbedo||null,gearNormal:textures.vanguardGearNormal||null,gearRoughness:textures.vanguardGearRoughness||null,gearSpecular:textures.vanguardGearSpecular||null,gearBump:textures.vanguardGearBump||null,
+  canvas:textures.vanguardCanvas||null,canvasNormal:textures.vanguardCanvasNormal||null,canvasBump:textures.vanguardCanvasBump||null,decal:textures.vanguardDecal||null,lens:textures.vanguardLens||null,grime:textures.vanguardGrime||null},
  kestrel:{albedo:textures.kestrelAlbedo||null,normal:textures.kestrelNormal||null,roughness:textures.kestrelRoughness||null,specular:textures.kestrelSpecular||null,bump:textures.kestrelBump||null},
  marauder:{albedo:textures.marauderAlbedo||null,normal:textures.marauderNormal||null,roughness:textures.marauderRoughness||null,specular:textures.marauderSpecular||null,bump:textures.marauderBump||null,hazard:textures.marauderHazard||null},
  uniform:new THREE.MeshStandardMaterial({map:textures.armor,color:0xc7bb95,roughness:1}),

@@ -30,6 +30,13 @@ export function band(loop,width,thickness){
  return solid(positions);
 }
 export function solid(positions){const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(positions.length/3*2),2));geo.computeVertexNormals();return geo;}
+// Worn metal from the shared generated running-gear maps (materials.vanguard.gear*), so fittings, hubs,
+// cages, hooks and fixtures are never flat colour. Tint and metalness pick steel, dark iron or rubber.
+export function gearMaterial(maps,high,color,metalness,scale=1.4){
+ const m=high?new THREE.MeshPhysicalMaterial({map:maps.gearAlbedo||null,normalMap:maps.gearNormal||null,normalScale:new THREE.Vector2(.6,.6),roughnessMap:maps.gearRoughness||null,roughness:1,metalness,specularColorMap:maps.gearSpecular||null,envMapIntensity:.8})
+  :new THREE.MeshStandardMaterial({map:maps.gearAlbedo||null,bumpMap:maps.gearBump||null,bumpScale:1,roughness:.88,metalness:Math.min(metalness,.2)});
+ m.color.setHex(color);m.userData.projectUV={scale};return m;
+}
 // Moves an oriented helper group's meshes into its parent so they batch with everything else.
 export function flatten(group){group.updateMatrix();for(const child of [...group.children]){child.applyMatrix4(group.matrix);group.parent.add(child);}group.parent.remove(group);}
 // Per-triangle box projection gives textured armor an even texel density on every facet.

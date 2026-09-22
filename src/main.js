@@ -1,12 +1,12 @@
 import './style.css';
 import {Game} from './game.js';
 import {UI} from './ui.js';
-const loading=document.querySelector('#loading');
+import {LoadingScreen,preloadInterface,nextPaint} from './loading.js';
+const loading=new LoadingScreen();loading.show();
 try{
- const game=new Game(document.querySelector('#world'));
- await game.init();
+ await nextPaint();await preloadInterface(f=>loading.update('Loading field interface',f*.04));
+ const game=new Game(document.querySelector('#world'));game.loadingScreen=loading;
+ await game.init((label,progress)=>loading.update(label,progress));
  const ui=new UI(game,document.querySelector('#ui'));
- // Local diagnostics for profiling and integration tests, not part of player state.
- window.tankz={game,ui};
- loading.classList.add('hidden');setTimeout(()=>loading.remove(),700);
-}catch(error){console.error(error);loading.querySelector('span').textContent='Unable to prepare the battlefield. Reload to retry.';const detail=document.createElement('p');detail.textContent=error.message;detail.style.cssText='max-width:600px;padding:20px;color:#eabf9b;font:13px monospace';loading.append(detail);loading.querySelector('i').remove();}
+ window.tankz={game,ui};const unlock=()=>{game.audio.start();window.removeEventListener('pointerdown',unlock);window.removeEventListener('keydown',unlock);};window.addEventListener('pointerdown',unlock);window.addEventListener('keydown',unlock);loading.hide();
+}catch(error){loading.fail(error);}

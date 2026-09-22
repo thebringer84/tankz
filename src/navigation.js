@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import {angleDelta,clamp,terrainHeight} from './config.js';
-const CELL=2,SIZE=100,HALF=100;
+import {angleDelta,clamp,terrainHeight,MAP_HALF} from './config.js';
+export const NAV_CELL=2,NAV_SIZE=Math.floor((MAP_HALF-9)*2/NAV_CELL);
+const CELL=NAV_CELL,SIZE=NAV_SIZE,HALF=SIZE*CELL/2;
 let terrainBlocked;
 function staticTerrain(){if(terrainBlocked)return terrainBlocked;terrainBlocked=new Uint8Array(SIZE*SIZE);for(let z=0;z<SIZE;z++)for(let x=0;x<SIZE;x++){const wx=(x+.5)*CELL-HALF,wz=(z+.5)*CELL-HALF;const slope=Math.hypot(terrainHeight(wx+1,wz)-terrainHeight(wx-1,wz),terrainHeight(wx,wz+1)-terrainHeight(wx,wz-1))/2;if(slope>.65||x===0||z===0||x===SIZE-1||z===SIZE-1)terrainBlocked[z*SIZE+x]=1;}return terrainBlocked;}
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export class Navigation {
- constructor(game,clearance=1.65){this.game=game;this.margin=clearance;this.terrainBlocked=staticTerrain();this.blocked=new Uint8Array(SIZE*SIZE);this.refreshAt=-Infinity;}
+ constructor(game,clearance=1.65){this.game=game;this.margin=clearance;this.terrainBlocked=staticTerrain();this.blocked=new Uint8Array(SIZE*SIZE);this.refreshAt=-Infinity;this.cost=new Float64Array(SIZE*SIZE);this.parent=new Int32Array(SIZE*SIZE);this.closed=new Uint8Array(SIZE*SIZE);this.heap=new Int32Array(SIZE*SIZE);this.heapIndex=new Int32Array(SIZE*SIZE);this.priority=new Float64Array(SIZE*SIZE);}
  index(p){return clamp(Math.floor((p.z+HALF)/CELL),0,SIZE-1)*SIZE+clamp(Math.floor((p.x+HALF)/CELL),0,SIZE-1);}
  point(i){const x=(i%SIZE+.5)*CELL-HALF,z=(Math.floor(i/SIZE)+.5)*CELL-HALF;return new THREE.Vector3(x,terrainHeight(x,z)+1,z);}
  refresh(){const g=this.game;if(g.time<this.refreshAt)return;this.refreshAt=g.time+1;this.blocked.set(this.terrainBlocked);
@@ -16,10 +17,18 @@ export class Navigation {
  }
  freeNear(i){if(!this.blocked[i])return i;const x=i%SIZE,z=Math.floor(i/SIZE);for(let r=1;r<14;r++){let best=-1,score=Infinity;for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++){const nx=x+dx,nz=z+dz;if(nx<1||nz<1||nx>=SIZE-1||nz>=SIZE-1)continue;const next=nz*SIZE+nx,d=dx*dx+dz*dz;if(!this.blocked[next]&&d<score){score=d;best=next;}}if(best>=0)return best;}return -1;}
  route(from,to){this.refresh();const start=this.freeNear(this.index(from)),goal=this.freeNear(this.index(to));if(start<0||goal<0)return [];
-  const cost=new Float32Array(SIZE*SIZE).fill(Infinity),parent=new Int32Array(SIZE*SIZE).fill(-1),closed=new Uint8Array(SIZE*SIZE),open=[start];cost[start]=0;
-  const heuristic=i=>Math.hypot(i%SIZE-goal%SIZE,Math.floor(i/SIZE)-Math.floor(goal/SIZE));
-  while(open.length){let best=0;for(let i=1;i<open.length;i++)if(cost[open[i]]+heuristic(open[i])<cost[open[best]]+heuristic(open[best]))best=i;const current=open.splice(best,1)[0];if(current===goal){const path=[];for(let i=goal;i!==start;i=parent[i])path.push(this.point(i));path.push(this.point(start));return path.reverse();}closed[current]=1;const x=current%SIZE,z=Math.floor(current/SIZE);
-   for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dz)continue;const nx=x+dx,nz=z+dz;if(nx<0||nz<0||nx>=SIZE||nz>=SIZE)continue;const next=nz*SIZE+nx;if(closed[next]||this.blocked[next]||(dx&&dz&&(this.blocked[z*SIZE+nx]||this.blocked[nz*SIZE+x])))continue;const value=cost[current]+(dx&&dz?Math.SQRT2:1);if(value<cost[next]){if(!Number.isFinite(cost[next]))open.push(next);cost[next]=value;parent[next]=current;}}
+  // Reuse search storage and decrease keys in an indexed heap. Linear open-list
+  // scans made a single obstructed route take an entire frame on the CPU.
+  const cost=this.cost,parent=this.parent,closed=this.closed,heap=this.heap,indices=this.heapIndex,priority=this.priority;
+  cost.fill(Infinity);parent.fill(-1);closed.fill(0);indices.fill(-1);let count=0;
+  const gx=goal%SIZE,gz=Math.floor(goal/SIZE);
+  const heuristic=i=>{const dx=Math.abs(i%SIZE-gx),dz=Math.abs(Math.floor(i/SIZE)-gz);return Math.max(dx,dz)+(Math.SQRT2-1)*Math.min(dx,dz);};
+  const up=i=>{const cell=heap[i];while(i>0){const p=(i-1)>>1;if(priority[heap[p]]<=priority[cell])break;heap[i]=heap[p];indices[heap[i]]=i;i=p;}heap[i]=cell;indices[cell]=i;};
+  cost[start]=0;priority[start]=heuristic(start);heap[count++]=start;indices[start]=0;
+  while(count){const current=heap[0],last=heap[--count];indices[current]=-1;
+   if(count){let i=0;while(i*2+1<count){let child=i*2+1;if(child+1<count&&priority[heap[child+1]]<priority[heap[child]])child++;if(priority[last]<=priority[heap[child]])break;heap[i]=heap[child];indices[heap[i]]=i;i=child;}heap[i]=last;indices[last]=i;}
+   if(current===goal){const path=[];for(let i=goal;i!==start;i=parent[i])path.push(this.point(i));path.push(this.point(start));return path.reverse();}closed[current]=1;const x=current%SIZE,z=Math.floor(current/SIZE);
+   for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dz)continue;const nx=x+dx,nz=z+dz;if(nx<0||nz<0||nx>=SIZE||nz>=SIZE)continue;const next=nz*SIZE+nx;if(closed[next]||this.blocked[next]||(dx&&dz&&(this.blocked[z*SIZE+nx]||this.blocked[nz*SIZE+x])))continue;const value=cost[current]+(dx&&dz?Math.SQRT2:1);if(value<cost[next]){cost[next]=value;parent[next]=current;priority[next]=value+heuristic(next);let i=indices[next];if(i<0){i=count++;heap[i]=next;}up(i);}}
   }return [];
  }
  clearGrid(from,to){const d=distance(from,to),steps=Math.max(1,Math.ceil(d/.8));for(let i=1;i<=steps;i++){const u=i/steps;if(this.blocked[this.index({x:from.x+(to.x-from.x)*u,z:from.z+(to.z-from.z)*u})])return false;}return true;}

@@ -14,6 +14,6 @@ export class AmbientOcclusion extends GTAOPass {
  setQuality(quality){this.resolutionScale=quality==='low'?.5:.75;this.updateGtaoMaterial({samples:quality==='low'?8:16});this.updatePdMaterial({samples:quality==='low'?8:16});}
  _overrideVisibility(){
   super._overrideVisibility();
-  this.scene.traverse(object=>{if(!object.isMesh||!object.visible)return;const materials=Array.isArray(object.material)?object.material:[object.material];if(materials.some(m=>m.transparent||!m.depthWrite)){object.visible=false;this._visibilityCache.push(object);}});
+  this.scene.traverse(object=>{if(!object.isMesh||!object.visible)return;const materials=Array.isArray(object.material)?object.material:[object.material];if(materials.some(m=>(m.transparent&&!m.userData.visibilityFade)||!m.depthWrite||(m.userData.visibilityFade&&m.opacity<.99))){object.visible=false;this._visibilityCache.push(object);}});
  }
 }
