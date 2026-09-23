@@ -79,6 +79,7 @@ The larger amber crosshair remains the predicted impact from the **current** gun
 - Visible paired tank tracks and speed-dependent dust emitted behind both tracks; jeeps kick up smaller tire dust plumes.
 - Dusk lighting with a low warm sun, cool sky fill, visible local blast lighting and cooling emissive metal fragments. Destruction uses shaped metal panels, wheels, rebar and fractured stone with convex collision rather than cube debris.
 - Local enemy AI, smoke countermeasure, kills and damage tracking, credit rewards, rematches and persistent preferences.
+- A destructible Baghdad-style district on the Dev Map, just north of the spawn: ten buildings (unfinished concrete frame, shop row, apartment block, shanasheel house, seven-storey hotel, ministry office with portico and T-walls, brick warehouse, mosque with tiled dome and minaret, courtyard house, petrol station) plus street dressing (asphalt, utility poles and wires, date palms, sandbags, HESCO, burnt-out cars). Every building is assembled from a modular kit of pre-fractured wall bays, slab tiles, columns, parapets, dome rings and drums. Shells punch real holes (rounds fly through windows and breaches), knocked-out load paths bring the storeys above down as falling chunks that shatter on impact, the minaret and palms topple as single pieces, fuel pumps explode, and fast tanks can ram through walls. Impacts throw plaster dust, instanced grit and glass glints, collapses roll a ground-hugging dust cloud and leave smouldering, baked rubble. A dithered cutaway keeps the tank visible behind or inside tall buildings. See `docs/buildings.md`.
 
 ## Scope and next steps
 
@@ -96,6 +97,7 @@ For online development, `commandFor()` already separates local/AI input commands
 - `src/debris.js`: material-specific physical fragments and fractured rubble geometry.
 - `src/effects.js`: particles and ground-conforming tread, scorch and smear decals.
 - `src/ragdolls.js`: physical crew ejection, articulation, cleanup and run-over detection.
+- `src/building-geometry.js`, `src/building-kit.js`, `src/building-catalog.js`, `src/buildings.js`, `src/building-fx.js`: fracture geometry, the modular building kit, the ten building blueprints plus street dressing, the destruction/collapse runtime, and grit/rubble/dust effects.
 - `src/audio.js`: local synthesized sound.
 - `sound_prompts.md`: production prompts and trigger notes for replacement SFX, adult crew reactions, squish, ambience and music; these new audio recordings are not yet generated or wired.
 - `src/ui.js`, `src/style.css`: screens and HUD.
@@ -108,6 +110,7 @@ For online development, `commandFor()` already separates local/AI input commands
 npm test
 npm run build
 npm run test:browser
+npm run test:buildings   # dev server on :5173; screenshots in test-artifacts/buildings/
 ```
 
 The physics tests cover ballistic math, turret wraparound, suspension/acceleration/braking across all tanks, CCD against a thin wall, climbing an actual rock mesh, dune jumps and landings, impact convergence on a pitched/rolled hull, weak jeep bullets, crew ejection/landing and run-over smears. The browser integration check requires the dev server on port 5173 and a local Chrome installation (or `TANKZ_BROWSER=chromium` with Playwright Chromium installed). It checks rendering errors, garage selection, menu stability, movement, Space firing, Q smoke, pause/resume and result flow. Screenshots go to ignored `test-artifacts/`.

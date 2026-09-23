@@ -28,7 +28,32 @@ export function ballisticElevation(distance,height,speed,gravity=-GRAVITY){
   const d=Math.max(.001,distance), q=speed**4-gravity*(gravity*d*d+2*height*speed*speed);
   return q<0 ? Math.PI/4 : Math.atan((speed*speed-Math.sqrt(q))/(gravity*d));
 }
+// Dev Map district: ten destructible buildings on flattened building pads.
+// hw/hd are pad half-extents in the lot's yawed frame; the pad blends out over LOT_FALLOFF.
+export const LOT_FALLOFF=6;
+export const BUILDING_LOTS=[
+ {type:'unfinished',x:-3,z:-18,yaw:Math.PI,hw:7.5,hd:7.5},
+ {type:'market',x:15,z:-20,yaw:Math.PI,hw:11,hd:5.5},
+ {type:'apartment',x:36,z:-19,yaw:Math.PI,hw:9,hd:6},
+ {type:'shanasheel',x:-8,z:-42,yaw:0,hw:6,hd:6},
+ {type:'hotel',x:6,z:-42,yaw:0,hw:7,hd:7},
+ {type:'government',x:26,z:-43,yaw:0,hw:11,hd:8},
+ {type:'warehouse',x:48,z:-42,yaw:0,hw:10,hd:7},
+ {type:'mosque',x:8,z:-67,yaw:0,hw:11,hd:12},
+ {type:'courtyard',x:40,z:0,yaw:-Math.PI/2,hw:7.5,hd:7.5},
+ {type:'petrol',x:-30,z:-2,yaw:Math.PI/2,hw:10,hd:8}
+];
+export function inBuildingLot(x,z,padding=0){return BUILDING_LOTS.some(l=>{const dx=x-l.x,dz=z-l.z,c=Math.cos(l.yaw),s=Math.sin(l.yaw),lx=dx*c-dz*s,lz=dx*s+dz*c;return Math.abs(lx)<l.hw+padding&&Math.abs(lz)<l.hd+padding;});}
 export function terrainHeight(x,z){
+ let height=null,blends=0;
+ // Inside a pad the ground is exactly flat; around it, blend back to the dunes.
+ for(const l of BUILDING_LOTS){const dx=x-l.x,dz=z-l.z,reach=l.hw+l.hd+LOT_FALLOFF;if(Math.abs(dx)>reach||Math.abs(dz)>reach)continue;const c=Math.cos(l.yaw),s=Math.sin(l.yaw),ex=Math.max(0,Math.abs(dx*c-dz*s)-l.hw),ez=Math.max(0,Math.abs(dx*s+dz*c)-l.hd),d=Math.hypot(ex,ez);if(d>=LOT_FALLOFF)continue;if(d===0)return lotHeight(l);
+  height??=rawTerrainHeight(x,z);const t=1-d/LOT_FALLOFF;height+=(lotHeight(l)-height)*t*t*(3-2*t);blends++;}
+ return blends?height:rawTerrainHeight(x,z);
+}
+function lotHeight(l){if(l.pad===undefined){let sum=0,n=0;for(let i=-2;i<=2;i++)for(let j=-2;j<=2;j++){const lx=i/2*l.hw,lz=j/2*l.hd,c=Math.cos(l.yaw),s=Math.sin(l.yaw);sum+=rawTerrainHeight(l.x+lx*c+lz*s,l.z-lx*s+lz*c);n++;}l.pad=sum/n;}return l.pad;}
+export function lotFrame(l){lotHeight(l);return l;}
+function rawTerrainHeight(x,z){
   // Rolling lanes with distinct dunes to launch from. Exact same samples feed the collider.
   let height=.65*Math.sin(x*.058)*Math.cos(z*.047)+.35*Math.sin(x*.15+z*.11)
     +5.8*Math.exp(-((x-23)**2/180+(z-8)**2/360))

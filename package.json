@@ -9,7 +9,8 @@
     "deploy": "npm run build && wrangler deploy",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --max-old-space-size=512 --test --test-concurrency=1 --test-timeout=30000 tests/*.test.js",
-    "test:browser": "node tests/smoke-browser.mjs"
+    "test:browser": "node tests/smoke-browser.mjs",
+    "test:buildings": "node tests/buildings-browser.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.0",

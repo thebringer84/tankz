@@ -68,6 +68,16 @@ export class AudioEngine {
   }
   cannon(distance=0,type='medium'){if(!this.playVehicleShot('cannon',.55/(1+distance*.045),type==='heavy'?.88:(type==='light'||type==='scout')?1.12:1))this.boom(.55,distance);}
 
+  // Masonry collapse: a long low rumble with a crackling rubble layer on top.
+  collapse(strength=1,distance=0){if(!this.ctx)return;const c=this.ctx,t=c.currentTime,level=Math.min(.8,.3+strength*.5)/(1+distance*.04),dur=1.6+strength*1.8;
+   const low=c.createBufferSource(),lf=c.createBiquadFilter(),lg=c.createGain();low.buffer=this.boomBuffer;low.loop=true;low.playbackRate.value=.55;lf.type='lowpass';lf.frequency.setValueAtTime(260,t);lf.frequency.exponentialRampToValueAtTime(70,t+dur);lg.gain.setValueAtTime(.0001,t);lg.gain.exponentialRampToValueAtTime(level,t+.08);lg.gain.exponentialRampToValueAtTime(.0001,t+dur);low.connect(lf);lf.connect(lg);lg.connect(this.sfxBus);low.start(t);low.stop(t+dur+.05);
+   const hi=c.createBufferSource(),hf=c.createBiquadFilter(),hg=c.createGain();hi.buffer=this.boomBuffer;hi.loop=true;hi.playbackRate.value=1.3;hf.type='bandpass';hf.frequency.value=1400;hf.Q.value=.7;hg.gain.setValueAtTime(.0001,t);
+   // Irregular gain steps read as individual chunks clattering down.
+   for(let i=0,at=t+.05;at<t+dur*.85;i++,at+=.04+Math.random()*.11)hg.gain.setValueAtTime(level*.35*Math.random()*(1-(at-t)/dur),at);hg.gain.setValueAtTime(.0001,t+dur);
+   hi.connect(hf);hf.connect(hg);hg.connect(this.sfxBus);hi.start(t);hi.stop(t+dur+.05);
+   const nodes=[low,lf,lg,hi,hf,hg];hi.onended=()=>{for(const n of nodes)n.disconnect();};}
+  // Short gritty thud for chunks knocked off a wall or landing.
+  debris(strength=1,distance=0){if(!this.ctx)return;const c=this.ctx,t=c.currentTime,n=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();n.buffer=this.boomBuffer;n.playbackRate.value=.8+Math.random()*.4;f.type='bandpass';f.frequency.value=380+Math.random()*500;f.Q.value=.9;g.gain.setValueAtTime(Math.min(.45,.12+strength*.3)/(1+distance*.05),t);g.gain.exponentialRampToValueAtTime(.0001,t+.35+strength*.3);n.connect(f);f.connect(g);g.connect(this.sfxBus);n.start(t);n.stop(t+.7);n.onended=()=>{n.disconnect();f.disconnect();g.disconnect();};}
   boom(strength=1,distance=0){if(!this.ctx)return;const c=this.ctx,t=c.currentTime,g=c.createGain(),f=c.createBiquadFilter(),b=this.boomBuffer;const n=c.createBufferSource();n.buffer=b;f.type='lowpass';f.frequency.setValueAtTime(1600,t);f.frequency.exponentialRampToValueAtTime(90,t+.6);g.gain.value=Math.min(.7,strength*.32)/(1+distance*.045);n.connect(f);f.connect(g);g.connect(this.sfxBus);n.start();n.stop(t+.8);n.onended=()=>{n.disconnect();f.disconnect();g.disconnect();};const o=c.createOscillator(),og=c.createGain();o.frequency.setValueAtTime(100,t);o.frequency.exponentialRampToValueAtTime(24,t+.25);og.gain.setValueAtTime(g.gain.value*.8,t);og.gain.exponentialRampToValueAtTime(.001,t+.3);o.connect(og);og.connect(this.sfxBus);o.start();o.stop(t+.32);o.onended=()=>{o.disconnect();og.disconnect();};}
   explosion(strength=1,distance=0,variant='standard'){
     if(!this.ctx||this.sfxVolume===0)return;

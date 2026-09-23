@@ -1,4 +1,4 @@
-import {MAP_SIZE,MAP_HALF,JUMP_RIDGES,seededRandom} from './config.js';
+import {MAP_SIZE,MAP_HALF,JUMP_RIDGES,seededRandom,inBuildingLot} from './config.js';
 
 export function inJumpLane(x,z,padding=6){return JUMP_RIDGES.some((r,i)=>{const dx=x-r.x,dz=z-r.z,across=dx*Math.cos(r.yaw)-dz*Math.sin(r.yaw),along=dx*Math.sin(r.yaw)+dz*Math.cos(r.yaw);return (Math.abs(across)<r.width+padding||(i%3===0&&Math.abs(across-22)<4+padding))&&along>-r.run-30-padding&&along<r.drop+35+padding;});}
 
@@ -10,7 +10,7 @@ export const ROCK_SITES=[];
 const random=seededRandom(6729);
 for(let tries=0;tries<5000&&ROCK_SITES.length<100;tries++){
  const x=(random()-.5)*(MAP_SIZE-42),z=(random()-.5)*(MAP_SIZE-42);
- if(Math.hypot(x,z-19)<30||inJumpLane(x,z)||RUIN_SITES.some(([rx,rz])=>Math.hypot(x-rx,z-rz)<23)||ROCK_SITES.some(([rx,rz])=>Math.hypot(x-rx,z-rz)<18))continue;
+ if(Math.hypot(x,z-19)<30||inJumpLane(x,z)||inBuildingLot(x,z,6)||RUIN_SITES.some(([rx,rz])=>Math.hypot(x-rx,z-rz)<23)||ROCK_SITES.some(([rx,rz])=>Math.hypot(x-rx,z-rz)<18))continue;
  ROCK_SITES.push([x,z]);
 }
 

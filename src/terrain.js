@@ -3,7 +3,7 @@ import {RUIN_SITES,ROCK_SITES} from './world-layout.js';
 import {TerrainRuts} from './terrain-ruts.js';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import {terrainHeight,MAP_SIZE,MAP_HALF,TERRAIN_SEGMENTS,JUMP_RIDGES,seededRandom} from './config.js';
+import {terrainHeight,MAP_SIZE,MAP_HALF,TERRAIN_SEGMENTS,JUMP_RIDGES,seededRandom,inBuildingLot} from './config.js';
 import {fracturedStoneGeometry} from './debris.js';
 import {terrainSampler,alignToGround,seatOnGround} from './grounding.js';
 import {freezeStatic,chunkInstances} from './render-geometry.js';
@@ -53,8 +53,8 @@ export function buildTerrain(scene,world,textures,materials,props,entities){
  for(let i=0;i<20;i++){const [cx,cz]=ruins[i%ruins.length],x=cx+6+rand()*2,z=cz+rand()*4;const mesh=new THREE.Mesh(new THREE.CylinderGeometry(.45,.45,1.3,12),materials.rust);const pr=addProp(mesh,x,terrainHeight(x,z)+.7,z,.45,.65,.45,65,true,35,false,'barrel');pr.explosive=true;}
  // Instanced dry shrubs: clustered low-poly foliage on small branches.
  const shrubMat=new THREE.MeshStandardMaterial({color:0x7d8058,roughness:1,flatShading:true});const shrubGeo=new THREE.IcosahedronGeometry(1,1),shrubs=new THREE.InstancedMesh(shrubGeo,shrubMat,6000);const d=new THREE.Object3D();let n=0;
- for(let i=0;i<1100;i++){const x=(rand()-.5)*(MAP_SIZE-15),z=(rand()-.5)*(MAP_SIZE-15);if(Math.hypot(x,z-17)<7)continue;const size=.35+rand()*.75;for(let j=0;j<5;j++){d.position.set(x+(rand()-.5)*size,terrainHeight(x,z)+size*.33+rand()*.35,z+(rand()-.5)*size);d.scale.set(size*.42,size*(.2+rand()*.3),size*.32);d.rotation.set(rand(),rand()*6,rand());seatOnGround(d,shrubGeo,surfaceHeight,.07);shrubs.setMatrixAt(n++,d.matrix);}}
- const branches=new THREE.InstancedMesh(new THREE.CylinderGeometry(.025,.05,1,4),materials.canvas,1000);let bn=0;const twigRand=seededRandom(919);for(let i=0;i<900;i++){const x=(twigRand()-.5)*(MAP_SIZE-15),z=(twigRand()-.5)*(MAP_SIZE-15);d.position.set(x,terrainHeight(x,z)+.35,z);d.scale.set(1,.6+twigRand()*.5,1);d.rotation.set((twigRand()-.5)*.5,twigRand()*6,(twigRand()-.5)*.5);seatOnGround(d,branches.geometry,surfaceHeight,.06);branches.setMatrixAt(bn++,d.matrix);}branches.count=bn;group.add(branches);shrubs.count=n;shrubs.castShadow=true;shrubs.receiveShadow=true;group.add(shrubs);
+ for(let i=0;i<1100;i++){const x=(rand()-.5)*(MAP_SIZE-15),z=(rand()-.5)*(MAP_SIZE-15);if(Math.hypot(x,z-17)<7)continue;const size=.35+rand()*.75;for(let j=0;j<5;j++){d.position.set(x+(rand()-.5)*size,terrainHeight(x,z)+size*.33+rand()*.35,z+(rand()-.5)*size);d.scale.set(size*.42,size*(.2+rand()*.3),size*.32);d.rotation.set(rand(),rand()*6,rand());seatOnGround(d,shrubGeo,surfaceHeight,.07);if(!inBuildingLot(x,z,.5))shrubs.setMatrixAt(n++,d.matrix);}}
+ const branches=new THREE.InstancedMesh(new THREE.CylinderGeometry(.025,.05,1,4),materials.canvas,1000);let bn=0;const twigRand=seededRandom(919);for(let i=0;i<900;i++){const x=(twigRand()-.5)*(MAP_SIZE-15),z=(twigRand()-.5)*(MAP_SIZE-15);d.position.set(x,terrainHeight(x,z)+.35,z);d.scale.set(1,.6+twigRand()*.5,1);d.rotation.set((twigRand()-.5)*.5,twigRand()*6,(twigRand()-.5)*.5);seatOnGround(d,branches.geometry,surfaceHeight,.06);if(!inBuildingLot(x,z,.5))branches.setMatrixAt(bn++,d.matrix);}branches.count=bn;group.add(branches);shrubs.count=n;shrubs.castShadow=true;shrubs.receiveShadow=true;group.add(shrubs);
  group.add(chunkInstances(shrubs,MAP_SIZE),chunkInstances(branches,MAP_SIZE));freezeStatic(group,new Set(props.filter(p=>p.dynamic).map(p=>p.mesh)));
  ruts.props=props;ruts.ruins=ruins;return {group,terrain,frontier,ruins,surfaceHeight,shrubs,branches,ruts,jumpRocks,jumpRidges:JUMP_RIDGES};
 }
