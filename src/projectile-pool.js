@@ -5,7 +5,10 @@ export class ProjectilePool {
  acquire(ammo,key,rocket,automatic){
   const id=rocket?'rocket':automatic?'bullet-'+ammo.color:key;let type=this.types.get(id);
   if(!type){let template;
-   if(!rocket&&!automatic)template=createCannonProjectile(ammo,key);
+   if(key==='frag-grenade'){
+    template=new THREE.Mesh(new THREE.SphereGeometry(.12,8,6),new THREE.MeshStandardMaterial({color:ammo.color,roughness:.8}));
+    const cap=new THREE.Mesh(new THREE.BoxGeometry(.09,.07,.08),new THREE.MeshStandardMaterial({color:0x343932,metalness:.5,roughness:.5}));cap.position.y=.12;template.add(cap);template.castShadow=true;
+   }else if(!rocket&&!automatic)template=createCannonProjectile(ammo,key);
    else{template=new THREE.Mesh(rocket?new THREE.CylinderGeometry(.07,.11,.8,8).rotateX(Math.PI/2):new THREE.BoxGeometry(.05,.05,.75),new THREE.MeshBasicMaterial({color:rocket?0x566044:ammo.color}));
     if(rocket){const engine=new THREE.Mesh(new THREE.ConeGeometry(.12,.7,8).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xffb34b,toneMapped:false}));engine.material.color.multiplyScalar(3);engine.position.z=-.65;template.add(engine);}
    }

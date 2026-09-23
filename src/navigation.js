@@ -10,7 +10,7 @@ export class Navigation {
  constructor(game,clearance=1.65){this.game=game;this.margin=clearance;this.terrainBlocked=staticTerrain();this.blocked=new Uint8Array(SIZE*SIZE);this.refreshAt=-Infinity;this.cost=new Float64Array(SIZE*SIZE);this.parent=new Int32Array(SIZE*SIZE);this.closed=new Uint8Array(SIZE*SIZE);this.heap=new Int32Array(SIZE*SIZE);this.heapIndex=new Int32Array(SIZE*SIZE);this.priority=new Float64Array(SIZE*SIZE);}
  index(p){return clamp(Math.floor((p.z+HALF)/CELL),0,SIZE-1)*SIZE+clamp(Math.floor((p.x+HALF)/CELL),0,SIZE-1);}
  point(i){const x=(i%SIZE+.5)*CELL-HALF,z=(Math.floor(i/SIZE)+.5)*CELL-HALF;return new THREE.Vector3(x,terrainHeight(x,z)+1,z);}
- refresh(){const g=this.game;if(g.time<this.refreshAt)return;this.refreshAt=g.time+1;this.blocked.set(this.terrainBlocked);
+ refresh(){const g=this.game;if(g.time<this.refreshAt)return;this.refreshAt=g.time+1;this.revision=(this.revision||0)+1;this.blocked.set(this.terrainBlocked);
   // Inflate obstacle footprints by the jeep's half-width plus turning clearance.
   for(const prop of g.props||[]){if(prop.destroyed)continue;const mesh=prop.mesh;if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();const matrix=new THREE.Matrix4().compose(new THREE.Vector3().copy(prop.body.translation()),new THREE.Quaternion().copy(prop.body.rotation()),mesh.scale);const box=mesh.geometry.boundingBox.clone().applyMatrix4(matrix).expandByScalar(this.margin);const x0=clamp(Math.floor((box.min.x+HALF)/CELL),0,SIZE-1),x1=clamp(Math.floor((box.max.x+HALF)/CELL),0,SIZE-1),z0=clamp(Math.floor((box.min.z+HALF)/CELL),0,SIZE-1),z1=clamp(Math.floor((box.max.z+HALF)/CELL),0,SIZE-1);for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++)this.blocked[z*SIZE+x]=1;}
 

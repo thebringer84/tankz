@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import {MAP_SIZE,JUMP_RIDGES} from '../src/config.js';
+import {MAP_SIZE,JUMP_RIDGES,INFANTRY_COUNT,JEEP_COUNT} from '../src/config.js';
 import {ROCK_SITES,inJumpLane} from '../src/world-layout.js';
 import {worldFixture,freeWorld} from './world-fixture.js';
 await RAPIER.init();
@@ -11,7 +11,7 @@ test('expanded world has distributed patrols, open jump lanes and local terrain 
  const g=await worldFixture();
  try{
   assert.ok(Math.abs(MAP_SIZE**2/220**2-6)<1e-10);
-  assert.equal(g.soldiers.length,250);assert.equal(g.tanks.filter(t=>t.enemy).length,25);
+  assert.equal(g.soldiers.length,INFANTRY_COUNT);assert.equal(g.tanks.filter(t=>t.enemy).length,JEEP_COUNT);
   assert.equal(g.environment.jumpRocks.length,8);assert.equal(JUMP_RIDGES.length,24);
   const frontier=g.environment.frontier;assert.equal(frontier.extensions.length,4);
   const handles=new Set(frontier.colliders.map(c=>c.handle));
@@ -45,12 +45,12 @@ test('expanded world has distributed patrols, open jump lanes and local terrain 
   }
   const far=g.soldiers.find(s=>s.body.translation().x>180);far.visibleToPlayer=false;far.ai.engaged=false;
   for(let i=0;i<4;i++){g.infantry.update(1/60);g.world.step();assert.ok(Number.isFinite(far.body.translation().y));}
-  far.ai.sees=true;g.infantry.update(1/60);assert.equal(far.movementState.tier,0,'active combat promotes immediately');
+  far.ai.sees=true;const physicalTier=far.movementState.tier;g.infantry.update(1/60);assert.equal(far.movementState.tier,physicalTier,'sight alone does not raise movement detail');
   const jeeps=g.tanks.filter(t=>t.enemy);
   for(const jeep of jeeps.slice(0,8))g.hurt(jeep,100000,g.player);
   assert.equal(g.mode,'playing');assert.equal(g.kills,8);
   for(const jeep of jeeps.slice(8))g.hurt(jeep,100000,g.player);
-  assert.equal(g.kills,25);assert.equal(g.mode,'results');assert.equal(g.credits,3300);
+  assert.equal(g.kills,JEEP_COUNT);assert.equal(g.mode,'results');assert.equal(g.credits,JEEP_COUNT*120+300);
  }finally{freeWorld(g);}
 });
 
@@ -90,11 +90,16 @@ test('turbo cannot drive through frontier fences on any edge',async()=>{
 
 test('deployment warm-up advances live simulation without consuming match time or player commands',async()=>{
  const g=await worldFixture();try{
-  g.deploymentIntro=true;const timer=g.timer,time=g.time,hp=g.player.hp;
+  g.player.body.setLinvel({x:3,y:0,z:2},true);g.player.body.setAngvel({x:0,y:1,z:0},true);
+  g.setDeploymentIntro(true);const timer=g.timer,time=g.time,hp=g.player.hp;
+  const position={...g.player.body.translation()},rotation={...g.player.body.rotation()};
   g.keys.add('KeyW');g.keys.add('Space');
-  for(let i=0;i<12;i++)g.step(1/60);
+  for(let i=0;i<120;i++){g.step(1/60);assert.deepEqual({...g.player.body.translation()},position);assert.deepEqual({...g.player.body.rotation()},rotation);}
   assert.equal(g.timer,timer);assert.equal(g.player.hp,hp);assert.equal(g.shells.length,0);assert.ok(g.time>time);
-  assert.equal(g.commandFor(g.player).throttle,0);g.keys.clear();g.deploymentIntro=false;g.step(1/60);
-  assert.ok(g.timer<timer);
+  assert.equal(g.commandFor(g.player).throttle,0);g.keys.clear();g.setDeploymentIntro(false);
+  assert.equal(g.player.body.bodyType(),RAPIER.RigidBodyType.Dynamic);
+  assert.deepEqual({...g.player.body.linvel()},{x:0,y:0,z:0});
+  g.keys.add('KeyW');for(let i=0;i<120;i++)g.step(1/60);
+  assert.ok(g.timer<timer);assert.ok(Math.hypot(g.player.body.translation().x-position.x,g.player.body.translation().z-position.z)>2,'controls move the tank after the intro');
  }finally{freeWorld(g);}
 });

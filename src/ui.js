@@ -67,7 +67,7 @@ export class UI {
    if(g.showroom){const selected=g.selected;for(const type of Object.keys(TANKS)){g.selectTank(type);await warmScene(g);}g.selectTank(selected);await warmScene(g);}
    if(destination==='deploy')await loading.revealDeployment(g);
    else{g.clock.getDelta();g.acc=0;g.loading=false;loading.hide();}
-  }catch(error){g.loading=true;g.deploymentIntro=false;this.root.inert=true;loading.fail(error);}
+  }catch(error){g.loading=true;g.setDeploymentIntro(false);this.root.inert=true;loading.fail(error);}
  }
  setting(el){const id=el.id;if(!['musicVolume','sfxVolume','shake','quality','showFps','showProfiler'].includes(id))return;this.settings[id]=['showFps','showProfiler'].includes(id)?el.checked:id==='quality'?el.value:Number(el.value);if(id==='showProfiler'){try{this.profiler.setEnabled(el.checked);}catch(error){this.settings.showProfiler=false;el.checked=false;this.toast(error.message);}}this.refs['fps-counter'].hidden=!this.settings.showFps;if(el.nextElementSibling?.tagName==='OUTPUT')el.nextElementSibling.textContent=`${Math.round(Number(el.value)*100)}%`;this.g.audio.setVolumes(this.settings);this.g.shakeSetting=this.settings.shake;if(id==='quality'){this.g.renderer.setPixelRatio(this.settings.quality==='low'?1:Math.min(devicePixelRatio,1.7));this.g.renderer.shadowMap.enabled=this.settings.quality!=='low';this.g.presentation.resize(this.settings.quality);}try{localStorage.setItem('tankz-settings',JSON.stringify(this.settings));}catch{}}
  toast(text){this.toastTimer=3.5;if(this.refs.toast){this.refs.toast.textContent=text;this.refs.toast.classList.add('visible');}}

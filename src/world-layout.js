@@ -14,7 +14,7 @@ for(let tries=0;tries<5000&&ROCK_SITES.length<100;tries++){
  ROCK_SITES.push([x,z]);
 }
 
-// Each of the 25 sectors gets a jeep and a ten-person squad. Nearby deployment
+// Each of the 25 sectors gets jeep patrols and an infantry squad. Nearby deployment
 // is excluded; individual spawners still check cover, occupancy and camera bounds.
 export const PATROL_SITES=[];
 for(let z=0;z<5;z++)for(let x=0;x<5;x++){

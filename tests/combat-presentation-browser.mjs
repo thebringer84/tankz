@@ -1,3 +1,4 @@
+import {INFANTRY_COUNT,JEEP_COUNT} from '../src/config.js';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
@@ -50,7 +51,7 @@ try{
   g.presentation.render(0);
   return {infantry:g.soldiers.length,jeeps:g.tanks.filter(t=>t.enemy).length,ridges:g.environment.jumpRidges.length,stones:g.environment.jumpRocks.length,area:MAP_SIZE**2/220**2,drawn,chunks:g.environment.ruts.patches.length};
  });
- assert.equal(world.infantry,250);assert.equal(world.jeeps,25);assert.equal(world.ridges,24);assert.equal(world.stones,8);assert.ok(Math.abs(world.area-6)<1e-10);assert.ok(world.drawn>0&&world.drawn<world.chunks);
+ assert.equal(world.infantry,INFANTRY_COUNT);assert.equal(world.jeeps,JEEP_COUNT);assert.equal(world.ridges,24);assert.equal(world.stones,8);assert.ok(Math.abs(world.area-6)<1e-10);assert.ok(world.drawn>0&&world.drawn<world.chunks);
  await page.screenshot({path:'test-artifacts/expanded-map-ridge.png'});console.log('Expanded world:',world);
  // Shift boosts through the real input mapping and the HUD reflects charge.
  await page.keyboard.down('w');await page.keyboard.down('Shift');

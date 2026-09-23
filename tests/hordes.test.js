@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {Infantry} from '../src/infantry.js';
 import {Navigation,NAV_SIZE} from '../src/navigation.js';
+import {InfantryRoutes} from '../src/infantry-routes.js';
 
 function planner(){const infantry=Object.create(Infantry.prototype);Object.assign(infantry,{coverJobs:new Map(),routeJobs:new Map(),neighbors:new Map(),game:{soldiers:[]}});return infantry;}
 
@@ -37,6 +38,17 @@ test('spatial separation matches all-pairs forces across negative coordinates an
  }
 });
 
+test('dense separation work stays bounded and overlapping troops receive finite motion',()=>{
+ const infantry=planner();
+ for(let i=0;i<1500;i++)infantry.game.soldiers.push({id:`soldier-${i}`,index:i,body:{translation:()=>({x:0,z:0})}});
+ infantry.rebuildNeighbors();
+ for(let tick=0;tick<8;tick++){
+  infantry.tick=tick;const motion=new THREE.Vector3();
+  infantry.separate(infantry.game.soldiers[0],{x:0,z:0},motion);
+  assert.ok(infantry.lastSeparationChecks<=36);assert.ok(Number.isFinite(motion.length()));assert.ok(motion.length()>0&&motion.length()<=5.50001);
+ }
+});
+
 test('heap searches recover from unreachable routes and return independent valid paths',()=>{
  const nav=new Navigation({time:0,props:[]});nav.refresh();nav.blocked.fill(0);
  const middle=Math.floor(NAV_SIZE/2);for(let z=0;z<NAV_SIZE;z++)nav.blocked[z*NAV_SIZE+middle]=1;
@@ -60,4 +72,21 @@ test('catch-up ticks share the same render-frame planning budget',()=>{
  infantry.beginFrame();for(let i=0;i<5;i++)infantry.plan();
  assert.equal(routes,4);assert.ok(cover<=32);infantry.endFrame();
  infantry.beginFrame();infantry.plan();infantry.endFrame();assert.equal(routes,8);
+});
+
+test('shared corridors serve more troops without increasing searches or catch-up budgets',()=>{
+ const infantry=planner();let searches=0;
+ infantry.navigation={revision:1,refresh(){},clearGrid:()=>true,route(from,to){searches++;return [new THREE.Vector3().copy(from),to.clone()];}};
+ infantry.sharedRoutes=new InfantryRoutes(infantry.navigation);
+ for(let i=0;i<200;i++){
+  const s={index:i,body:{translation:()=>({x:0,y:0,z:0})}};
+  infantry.routeJobs.set(s,new THREE.Vector3(40,0,40));
+ }
+ infantry.beginFrame();for(let i=0;i<5;i++)infantry.plan();infantry.endFrame();
+ assert.equal(searches,1);assert.equal(infantry.sharedRoutes.hits,31);assert.equal(infantry.routeJobs.size,168);
+ // Different unreachable-to-cache destinations still have at most four searches.
+ infantry.routeJobs.clear();
+ for(let i=0;i<20;i++)infantry.routeJobs.set({index:i,body:{translation:()=>({x:0,y:0,z:0})}},new THREE.Vector3(100+i*20,0,100));
+ const before=searches;infantry.beginFrame();for(let i=0;i<5;i++)infantry.plan();infantry.endFrame();
+ assert.equal(searches-before,4);
 });

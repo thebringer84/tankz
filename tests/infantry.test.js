@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {animateInfantry} from '../src/infantry-animation.js';
 import {Game} from '../src/game.js';
+import {INFANTRY_COUNT,FRAG_GRENADE} from '../src/config.js';
 import {Infantry} from '../src/infantry.js';
 import {makeMaterials} from '../src/models.js';
 import {Ragdolls} from '../src/ragdolls.js';
@@ -24,7 +25,7 @@ test('running over a crowd safely evicts ragdolls during the same update',()=>{
   assert.ok(g.smears>0);assert.ok(g.ragdolls.items.every(item=>item.parts.every(part=>part.body.isValid())));
  }finally{g.world.free();}
 });
-test('deployment populates 250 infantry in 25 roaming squads',()=>{const g=setup();g.infantry.deploy();assert.deepEqual(g.infantry.squads.map(s=>s.members.length),Array(25).fill(10));assert.equal(g.soldiers.length,250);assert.ok(g.soldiers.every(s=>s.crew.parts.length===11&&s.muzzlePoint));g.world.free();});
+test('deployment populates the configured infantry in 25 roaming squads',()=>{const g=setup();g.infantry.deploy();assert.deepEqual(g.infantry.squads.map(s=>s.members.length),Array(25).fill(INFANTRY_COUNT/25));assert.equal(g.soldiers.length,INFANTRY_COUNT);assert.ok(g.soldiers.every(s=>s.crew.parts.length===11&&s.muzzlePoint));g.world.free();});
 test('infantry fires low-damage physical machine-gun rounds',()=>{const g=setup(),s=g.infantry.spawn(0,15);g.fire(s,true);assert.equal(g.shells.length,1);assert.ok(g.shells[0].damage<1);assert.ok(g.shells[0].body.isDynamic());assert.ok(s.secondary>0);g.world.free();});
 test('explosion launches jointed infantry ragdolls and cleans up live colliders',()=>{const g=setup(),s=g.infantry.spawn(0,15),p=new THREE.Vector3().copy(s.body.translation());g.infantry.blast(p.clone().add(new THREE.Vector3(1,0,0)),7,150);assert.ok(s.dead);assert.equal(g.entities.has(s.collider.handle),false);assert.equal(g.ragdolls.items.length,1);assert.equal(g.ragdolls.items[0].joints.length,10);assert.ok(g.ragdolls.items[0].parts[0].body.linvel().y>4);g.infantry.blast(p,7,150);assert.equal(g.ragdolls.items.length,1);g.world.free();});
 test('running over standing infantry first ragdolls beneath the tank, then produces one smear',()=>{const g=setup(),s=g.infantry.spawn(0,15),p=s.body.translation();g.player.body.setTranslation({x:p.x,y:p.y,z:p.z},true);g.player.grounded=6;g.player.speed=5;g.infantry.sync();g.infantry.sync();assert.ok(s.dead);assert.equal(g.smears,0);assert.equal(g.entities.has(s.collider.handle),false);assert.equal(g.ragdolls.items.length,1);assert.equal(g.ragdolls.items[0].parts.length,11);for(let i=0;i<12;i++){g.world.step();g.ragdolls.update(1/60,g.player);}assert.equal(g.smears,0,'ragdoll must remain visible before crushing');g.player.speed=0;for(let i=0;i<60;i++){g.world.step();g.ragdolls.update(1/60,g.player);}assert.equal(g.smears,1);assert.ok(g.ragdolls.items.length>=6&&g.ragdolls.items.length<=8);assert.ok(g.ragdolls.items.every(r=>r.limb));for(let i=0;i<150;i++){g.world.step();g.ragdolls.update(1/60,null);}const limb=g.ragdolls.items[0],lp=limb.parts[0].body.translation();g.player.body.setTranslation({x:lp.x,y:lp.y+.8,z:lp.z},true);g.player.grounded=6;g.player.speed=4;g.ragdolls.update(1/60,g.player);assert.ok(!g.ragdolls.items.includes(limb));assert.ok(g.smears>=2);g.world.free();});
@@ -50,6 +51,42 @@ test('running kinematic soldiers cannot push the tank chassis',()=>{const g=setu
 test('RPG soldiers wait to aim, reset when sight is lost, and launch a physical explosive rocket',()=>{const g=setup(),s=g.infantry.spawn(0,15,null,0,'rpg');s.ai.state='pursue';s.ai.sees=true;s.ai.lastKnown.copy(s.body.translation()).add(new THREE.Vector3(0,0,30));s.ai.goal.copy(s.body.translation());s.yaw=0;for(let i=0;i<45;i++){g.time+=1/60;g.infantry.update(1/60);}assert.equal(g.shells.length,0);assert.ok(s.aimTime>.6);s.ai.sees=false;g.infantry.update(1/60);assert.equal(s.aimTime,0);s.ai.sees=true;for(let i=0;i<75;i++){g.time+=1/60;g.infantry.update(1/60);}assert.equal(g.shells.length,1);const r=g.shells[0];assert.ok(r.rocket&&!r.secondary&&r.body.isDynamic());assert.ok(r.damage>=90&&r.ammo.radius>3);assert.ok(s.secondary>4);g.world.free();});
 
 test('specialists animate carry, shoulder aim and reload with visible equipment',()=>{const g=setup(),s=g.infantry.spawn(0,15,null,0,'rpg');for(let i=0;i<40;i++)animateInfantry(s,1/60);assert.equal(s.weaponPose,'carry');const carryY=s.gun.position.y;s.ai.sees=true;s.secondary=0;for(let i=0;i<80;i++)animateInfantry(s,1/60);assert.equal(s.weaponPose,'aim');assert.ok(s.gun.position.y>carryY+.3);assert.ok(s.gun.userData.round.visible);s.secondary=4;animateInfantry(s,1/60);assert.equal(s.weaponPose,'reload');assert.equal(s.gun.userData.round.visible,false);const f=g.infantry.spawn(10,15,null,0,'flame');assert.equal(f.gun.name,'Flamethrower');g.world.free();});
+
+test('grenadier attacks at short range with faster repeated throws and resets wind-up on lost sight',()=>{
+ const g=setup();try{
+  const s=g.infantry.spawn(0,15,null,0,'grenadier');s.ai.state='pursue';s.ai.sees=true;s.ai.engaged=true;s.yaw=0;
+  s.ai.lastKnown.copy(s.body.translation()).add(new THREE.Vector3(0,0,18));
+  g.infantry.decide=()=>new THREE.Vector3();
+  for(let i=0;i<10;i++){g.time+=1/60;g.infantry.update(1/60);}assert.equal(g.shells.length,0);
+  s.ai.sees=false;g.infantry.update(1/60);assert.equal(s.aimTime,0);s.ai.sees=true;
+  for(let i=0;i<130;i++){g.time+=1/60;g.infantry.update(1/60);}
+  assert.equal(g.shells.length,2);assert.ok(g.shells.every(p=>p.grenade&&!p.rocket&&!p.secondary&&p.body.linvel().y>0));
+  assert.ok(s.secondary<=FRAG_GRENADE.reload);
+  for(const range of [3,30]){s.secondary=0;s.ai.lastKnown.copy(s.body.translation()).add(new THREE.Vector3(0,0,range));for(let i=0;i<40;i++)g.infantry.update(1/60);assert.equal(g.shells.length,2);}
+ }finally{g.world.free();}
+});
+
+test('grenades bounce without contact detonation, explode once on their fuse, damage nearby tanks and clean up',()=>{
+ const g=setup();try{
+  const s=g.infantry.spawn(0,15,null,0,'grenadier');s.ai.sees=true;s.ai.lastKnown.copy(s.body.translation()).add(new THREE.Vector3(0,0,15));g.fire(s,false);
+  const grenade=g.shells[0];assert.ok(grenade.collider.restitution()>0);assert.ok(!grenade.collider.isSensor());
+  g.impact(grenade,g.player);assert.equal(grenade.dead,false);g.impact(grenade,undefined);assert.equal(grenade.dead,false);
+  const p=g.player.body.translation();grenade.body.setTranslation({x:p.x+1,y:p.y,z:p.z},true);grenade.life=FRAG_GRENADE.fuse-.01;
+  let blasts=0;g.blast=()=>blasts++;g.visibility.pointVisible=()=>true;const hp=g.player.hp,handle=grenade.collider.handle;
+  g.updateProjectiles(.02);assert.equal(blasts,1);assert.ok(g.player.hp<hp);assert.equal(g.shells.length,0);assert.equal(g.entities.has(handle),false);
+  g.updateProjectiles(.1);assert.equal(blasts,1);
+ }finally{g.world.free();}
+});
+
+test('grenadier has a visible throwing pose and hidden grenade during follow-through',()=>{
+ const g=setup();try{
+  const s=g.infantry.spawn(0,15,null,0,'grenadier');animateInfantry(s,0);const carry=s.gun.position.clone();
+  s.ai.sees=true;s.aimTime=FRAG_GRENADE.windup*.5;animateInfantry(s,0);assert.equal(s.weaponPose,'windup');assert.ok(s.gun.position.y>carry.y+.5);
+  s.aimTime=FRAG_GRENADE.windup;animateInfantry(s,0);assert.ok(s.gun.position.z>.5);assert.ok(s.gun.userData.grenade.visible);
+  s.secondary=FRAG_GRENADE.reload;animateInfantry(s,0);assert.equal(s.weaponPose,'follow-through');assert.equal(s.gun.userData.grenade.visible,false);
+  assert.equal(g.infantry.crowd.eligible(s),false);
+ }finally{g.world.free();}
+});
 test('flamethrower damages a nearby target but solid cover blocks its stream',()=>{const g=setup(),s=g.infantry.spawn(0,8,null,0,'flame');s.body.setTranslation({x:0,y:.8,z:8},true);s.root.position.set(0,.8,8);s.root.rotation.y=Math.PI;s.gun.position.set(.1,.75,.1);g.player.body.setTranslation({x:0,y:1,z:0},true);g.world.step();let reach=0;g.fx.flameStream=(p,d,length)=>{reach=length;};const before=g.player.hp;g.infantry.flameAttack(s,.1);assert.ok(g.player.hp<before);assert.ok(reach<9);g.world.createCollider(RAPIER.ColliderDesc.cuboid(3,2,.2).setTranslation(0,1,4));g.world.step();const protectedHp=g.player.hp;s.flameEmission=0;g.infantry.flameAttack(s,.1);assert.equal(g.player.hp,protectedHp);assert.ok(reach<4);g.world.free();});
 
 test('flamethrower death detonates once and launches dismembered parts upward',()=>{const g=setup(),s=g.infantry.spawn(15,15,null,0,'flame');let blasts=0;g.blast=(p,size,kind,variant)=>{blasts++;assert.equal(variant,'fuel');assert.ok(size>1);};g.infantry.kill(s);assert.equal(blasts,1);assert.ok(g.ragdolls.items.length>=6&&g.ragdolls.items.length<=8);assert.ok(g.ragdolls.items.every(r=>r.limb&&r.parts.every(p=>p.body.linvel().y>10)));g.infantry.kill(s);assert.equal(blasts,1);assert.equal(g.smears,1);g.world.free();});
@@ -98,6 +135,27 @@ test('engaged decisions stagger at 20 Hz while movement and weapon timing stay a
   for(const s of soldiers){assert.equal(decisions.get(s).length,40);assert.equal(moves.get(s),120);}
   assert.equal(new Set(soldiers.map(s=>decisions.get(s)[0])).size,3,'soldiers use different decision phases');
   assert.ok(shots.some(({s,tick})=>!decisions.get(s).includes(tick)),'firing is not limited to decision ticks');
+ }finally{g.world.free();}
+});
+
+test('an overloaded infantry frame defers thinking but keeps every capsule and weapon timer updating',()=>{
+ const g=setup();try{
+  for(let i=0;i<140;i++)g.infantry.spawn((i%20-10)*3,35+Math.floor(i/20)*3,null,i);
+  assert.equal(g.soldiers.length,140);
+  for(const s of g.soldiers){s.ai.sees=true;s.ai.state='pursue';s.secondary=1;}
+  let decisions=0,moves=0;
+  g.infantry.decide=()=>{decisions++;return new THREE.Vector3();};
+  const move=g.infantry.movement.move.bind(g.infantry.movement);
+  g.infantry.movement.move=(...args)=>{moves++;return move(...args);};
+  g.infantry.beginFrame();
+  for(let i=0;i<3;i++){g.time+=1/60;g.infantry.update(1/60);g.world.step();}
+  g.infantry.endFrame();
+  assert.equal(decisions,128);assert.equal(moves,140*3);
+  assert.ok(g.soldiers.every(s=>Math.abs(s.secondary-.95)<1e-8));
+  const hurt=g.soldiers.at(-1),order=[];hurt.recentDamageUntil=g.time+1;
+  g.infantry.decide=s=>{order.push(s);return new THREE.Vector3();};
+  g.infantry.beginFrame();g.infantry.update(1/60);g.infantry.endFrame();
+  assert.equal(order[0],hurt,'new damage takes priority over queued ordinary decisions');
  }finally{g.world.free();}
 });
 

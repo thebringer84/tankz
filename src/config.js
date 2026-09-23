@@ -4,8 +4,8 @@ export const GRAVITY = -18;
 export const MAP_SIZE = 220 * Math.sqrt(6);
 export const MAP_HALF = MAP_SIZE / 2;
 export const TERRAIN_SEGMENTS = 432;
-export const INFANTRY_COUNT = 250;
-export const JEEP_COUNT = 25;
+export const INFANTRY_COUNT = 500;
+export const JEEP_COUNT = 15;
 export const MATCH_DURATION = 900;
 export const JUMP_RIDGES = [];
 for(let row=-2;row<=2;row++)for(let col=-2;col<=2;col++){
@@ -45,3 +45,4 @@ export function seededRandom(seed=8173){return ()=>{seed|=0;seed=seed+0x6D2B79F5
 // Prototype opposition: one cannon hit kills a jeep; sustained MG fire chips armor.
 export const JEEP = {name:'PATROL JEEP',role:'LIGHT PATROL',hp:100,mass:580,speed:12,power:6200,traverse:2.4,elevation:1.4,reload:.12,damage:1,scale:1,wheelX:.9,wheelZ:1.2,suspensionRest:.88,suspensionReach:1.12,spring:22};
 export const JEEP_AMMO = {speed:95,damage:1.2,radius:0,color:0xffd29a};
+export const FRAG_GRENADE = {range:18,minRange:5,windup:.3,reload:1.4,fuse:1.6,damage:60,radius:3.2,color:0x71804a};

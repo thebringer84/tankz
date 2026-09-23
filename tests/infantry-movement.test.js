@@ -27,7 +27,7 @@ for(const engaged of [false,true])test(`${engaged?'engaged':'distant'} movement 
   for(let i=0;i<120;i++){const p=f.tick();assert.ok(p.x>last,'capsule advances on every tick');assert.ok(Math.abs(p.y-.725)<.04);last=p.x;}
   assert.ok(Math.abs(last-start-4)<.05,'two seconds preserve requested patrol speed');
   assert.ok(f.calls()<20,`expected amortized movement queries, got ${f.calls()}`);
-  assert.equal(f.s.movementState.tier,engaged?0:2,'combat relevance is independent of movement reuse');
+  assert.equal(f.s.movementState.tier,2,'sight does not raise physical movement detail');
   const p=f.s.body.translation();const hit=f.world.castRay(new RAPIER.Ray({x:p.x,y:p.y,z:-2},{x:0,y:0,z:1}),4,true);
   assert.equal(hit.collider.handle,f.s.collider.handle,'distant soldier remains hittable');
  }finally{f.world.free();}
@@ -37,7 +37,7 @@ test('stationary engaged soldiers retain current hitboxes with fewer controller 
  const f=fixture();try{
   f.s.ai.sees=true;const zero=new THREE.Vector3();
   for(let i=0;i<120;i++)f.tick(zero);
-  assert.equal(f.s.movementState.tier,0);assert.ok(f.calls()<25,`stationary controller calls: ${f.calls()}`);
+  assert.equal(f.s.movementState.tier,2);assert.ok(f.calls()<25,`stationary controller calls: ${f.calls()}`);
   const p=f.s.body.translation();assert.ok(Math.abs(p.y-.725)<.01);assert.ok(Math.abs(p.x)<.001);
   const hit=f.world.castRay(new RAPIER.Ray({x:0,y:p.y,z:-2},{x:0,y:0,z:1}),4,true);
   assert.equal(hit.collider.handle,f.s.collider.handle);
@@ -74,7 +74,7 @@ test('engaged corridor reuse waits for physical hazards to clear',()=>{
   f.s.ai.sees=true;for(let i=0;i<20;i++)f.tick();assert.ok(f.s.movementState.segment);
   f.s.recentDamageUntil=f.g.time+.03;const before=f.calls();f.tick();assert.equal(f.calls(),before+1);assert.equal(f.s.movementState.segment,null);
   for(let i=0;i<20;i++)f.tick();assert.equal(f.s.movementState.collisionQuiet<.5,true);assert.equal(f.s.movementState.segment,null);
-  for(let i=0;i<20;i++)f.tick();assert.ok(f.s.movementState.segment);assert.equal(f.s.movementState.tier,0);
+  for(let i=0;i<20;i++)f.tick();assert.ok(f.s.movementState.segment);assert.equal(f.s.movementState.tier,2);
  }finally{f.world.free();}
 });
 
@@ -86,7 +86,7 @@ test('incoming projectiles, fast vehicles and recent damage promote immediately;
   f.tick();assert.equal(f.s.movementState.tier,0);assert.equal(f.calls(),before+1);assert.equal(f.s.movementState.segment,null);
   f.g.shells=[];for(let i=0;i<10;i++)f.tick();assert.equal(f.s.movementState.tier,0);
   for(let i=0;i<35;i++)f.tick();assert.equal(f.s.movementState.tier,2);
-  f.g.player={body:{translation:()=>({x:f.s.body.translation().x+20,y:1,z:0}),linvel:()=>({x:-40,y:0,z:0})}};f.g.tanks=[f.g.player];
+  f.g.player={body:{translation:()=>({x:f.s.body.translation().x+10,y:1,z:0}),linvel:()=>({x:-40,y:0,z:0})}};f.g.tanks=[f.g.player];
   f.tick();assert.equal(f.s.movementState.tier,0,'turbo approach promotes before contact');
   f.g.tanks=[];f.s.recentDamageUntil=f.g.time+1;for(let i=0;i<40;i++)f.tick();assert.equal(f.s.movementState.tier,0);
  }finally{f.world.free();}
@@ -97,7 +97,7 @@ test('reveal changes detail and turning never reuses a stale movement segment',(
   for(let i=0;i<20;i++)f.tick();const start=f.s.body.translation();
   f.s.visibleToDrone=true;f.tick(new THREE.Vector3(0,0,2));
   const next=f.s.body.translation();assert.equal(f.s.movementState.tier,1);assert.ok(Math.abs(next.x-start.x)<.001);assert.ok(next.z>start.z);
-  f.s.ai.sees=true;f.tick();assert.equal(f.s.movementState.tier,0);
+  f.s.ai.sees=true;f.tick();assert.equal(f.s.movementState.tier,1);
  }finally{f.world.free();}
 });
 
@@ -109,5 +109,17 @@ test('invalid support, slopes and blocked navigation refuse simplified movement'
   f.world.castRayAndGetNormal=()=>null;assert.equal(f.movement.validate(f.s,p,motion,.2,f.nav,filter),null);
   f.world.castRayAndGetNormal=(...args)=>({...cast(...args),normal:{x:.7,y:.7,z:0}});
   assert.equal(f.movement.validate(f.s,p,motion,.2,f.nav,filter),null);
+ }finally{f.world.free();}
+});
+
+test('seeing a nearby tank preserves cheap movement outside its swept contact footprint',()=>{
+ const f=fixture();try{
+  f.s.ai.sees=true;f.s.visibleToPlayer=true;
+  f.g.player={cfg:{scale:1},body:{translation:()=>({x:12,y:1,z:0}),linvel:()=>({x:0,y:0,z:0})}};
+  f.g.tanks=[f.g.player];
+  for(let i=0;i<60;i++)f.tick();
+  assert.equal(f.s.movementState.tier,1);assert.ok(f.calls()<10);
+  f.g.player.body.linvel=()=>({x:-50,y:0,z:0});
+  const before=f.calls();f.tick();assert.equal(f.s.movementState.tier,0);assert.equal(f.calls(),before+1);
  }finally{f.world.free();}
 });

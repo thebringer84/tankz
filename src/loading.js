@@ -29,7 +29,7 @@ export class LoadingScreen {
  async revealDeployment(game){
   const e=this.element,ui=document.querySelector('#ui');let animation;
   clearTimeout(this.hideTimer);e.classList.add('deployment-reveal');this.update('Ready',1);ui.inert=true;
-  game.deploymentIntro=true;game.firing=game.altFire=false;game.keys.clear();game.clock.getDelta();game.acc=0;game.loading=false;
+  game.setDeploymentIntro(true);game.firing=game.altFire=false;game.keys.clear();game.clock.getDelta();game.acc=0;game.loading=false;
   try{
    await waitForDeploymentFrames();
    if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
@@ -38,7 +38,7 @@ export class LoadingScreen {
    }
    e.hidden=true;
   }finally{
-   animation?.cancel();e.classList.remove('deployment-reveal');game.deploymentIntro=false;
+   animation?.cancel();e.classList.remove('deployment-reveal');game.setDeploymentIntro(false);
    game.firing=game.altFire=false;game.keys.clear();ui.inert=false;
   }
  }

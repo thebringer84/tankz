@@ -1,3 +1,4 @@
+import {SplatVariants} from './splat-atlas.js';
 import {ParticlePool} from './particle-pool.js';
 import {createCannonProjectile} from './projectile-visuals.js';
 import {DustRenderer} from './vehicle-dust.js';
@@ -46,11 +47,25 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
   treadMat.onBeforeCompile=s=>{Object.assign(s.uniforms,this.surfaceUniforms);s.vertexShader=surfaceGLSL+'\n'+s.vertexShader;s.vertexShader=s.vertexShader.replace('#include <project_vertex>','vec4 wp=modelMatrix*instanceMatrix*vec4(transformed,1.);wp.y=groundY(wp.xz)+.065;vec4 mvPosition=viewMatrix*wp;gl_Position=projectionMatrix*mvPosition;');};
   const pos=[],uv=[];for(let i=0;i<4;i++){let z=-.3+i*.18;pos.push(-.26,0,z,.26,0,z,-.26,0,z+.07,.26,0,z,.26,0,z+.07,-.26,0,z+.07);}const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));tg.computeVertexNormals();
   this.tracks=new THREE.InstancedMesh(tg,treadMat,3200);this.tracks.renderOrder=-2;this.tracks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.trackIndex=0;this.trackCount=0;this.tracks.count=0;this.tracks.frustumCulled=false;scene.add(this.tracks);
-  const scorchMat=new THREE.ShaderMaterial({uniforms:{...this.surfaceUniforms,craterTex:{value:textures.crater||smokeTexture}},transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-3,side:THREE.DoubleSide,vertexShader:surfaceGLSL+`varying vec2 vUv;void main(){vUv=uv;vec4 wp=modelMatrix*instanceMatrix*vec4(position,1.);wp.y=groundY(wp.xz)+.06;gl_Position=projectionMatrix*viewMatrix*wp;}`,fragmentShader:`uniform sampler2D craterTex;varying vec2 vUv;void main(){vec4 decal=texture2D(craterTex,vUv);gl_FragColor=vec4(decal.rgb*.76,decal.a*.88);
+  this.splatVariants=new SplatVariants(()=>this.rand());
+  const decalVertex=surfaceGLSL+`attribute float aSplat;varying vec2 vUv;varying float vSplat;void main(){vUv=uv;vSplat=aSplat;vec4 wp=modelMatrix*instanceMatrix*vec4(position,1.);wp.y=groundY(wp.xz)+.06;gl_Position=projectionMatrix*viewMatrix*wp;}`;
+  const makeDecals=(capacity,blood)=>{
+   const material=new THREE.ShaderMaterial({uniforms:{...this.surfaceUniforms,splatAtlas:{value:textures.splats||textures.crater||smokeTexture},useAtlas:{value:textures.splats?1:0},blood:{value:blood?1:0}},transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-3,side:THREE.DoubleSide,vertexShader:decalVertex,
+    fragmentShader:`uniform sampler2D splatAtlas;uniform float useAtlas,blood;varying vec2 vUv;varying float vSplat;void main(){
+     vec4 decal;
+     if(useAtlas>.5){vec2 cell=vec2(mod(vSplat,4.),3.-floor(vSplat/4.));vec2 uv=(cell+mix(vec2(4.5/512.),vec2(507.5/512.),vUv))/4.;decal=texture2D(splatAtlas,uv);}
+     else if(blood>.5){decal=vec4(.25,.014,.020,(1.-smoothstep(.25,.85,length(vUv*2.-1.)))*.82);}
+     else{decal=texture2D(splatAtlas,vUv);}
+     gl_FragColor=vec4(decal.rgb*.76,decal.a*.88);
 #include <tonemapping_fragment>
-#include <colorspace_fragment>}`});  this.scorches=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1,6,6).rotateX(-Math.PI/2),scorchMat,100);this.scorches.renderOrder=-2;this.scorches.count=0;this.scorches.frustumCulled=false;this.scorchIndex=0;scene.add(this.scorches);this.dummy=new THREE.Object3D();
-  const smearMat=scorchMat.clone();Object.assign(smearMat.uniforms,this.surfaceUniforms);smearMat.vertexShader=smearMat.vertexShader.replace('varying vec2 vUv;','varying vec2 vUv;varying float vSeed;').replace('vUv=uv;','vUv=uv;vSeed=instanceMatrix[3].x*1.73+instanceMatrix[3].z*2.91;');smearMat.fragmentShader=`varying float vSeed;varying vec2 vUv;float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7))+vSeed)*43758.5453);}float stainNoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}void main(){vec2 p=vUv*2.-1.;float r=length(p);float ragged=.78+.065*sin(p.y*37.+vSeed)+.06*sin(p.x*29.-vSeed);float alpha=(1.-smoothstep(.25,ragged,r))*.82;float streak=.65+.35*stainNoise(p*11.);gl_FragColor=vec4(vec3(.25,.014,.020)*(.8+.2*sin(vSeed)),alpha*streak);}`;
-  this.smears=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1,8,8).rotateX(-Math.PI/2),smearMat,192);this.smears.renderOrder=-2;this.smears.count=0;this.smears.frustumCulled=false;this.smearIndex=0;scene.add(this.smears);
+#include <colorspace_fragment>
+    }`});
+   const geometry=new THREE.PlaneGeometry(1,1,8,8).rotateX(-Math.PI/2);
+   geometry.setAttribute('aSplat',new THREE.InstancedBufferAttribute(new Float32Array(capacity),1).setUsage(THREE.DynamicDrawUsage));
+   const mesh=new THREE.InstancedMesh(geometry,material,capacity);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.renderOrder=-2;mesh.count=0;mesh.frustumCulled=false;scene.add(mesh);return mesh;
+  };
+  this.scorches=makeDecals(100,false);this.scorchIndex=0;this.dummy=new THREE.Object3D();
+  this.smears=makeDecals(192,true);this.smearIndex=0;
 
  }
  setLightBudget(count){
@@ -71,11 +86,11 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
 
  blood(pos,direction,scale=1){
   const axis=direction.clone().normalize();for(let i=0;i<Math.ceil(28*scale);i++){const velocity=axis.clone().multiplyScalar((2+this.rand()*5)*scale).add(new THREE.Vector3((this.rand()-.5)*5,1+this.rand()*4,(this.rand()-.5)*5));this.emit(pos,velocity,i%3?0x79131b:0xb62a27,.08+this.rand()*.18,.7+this.rand()*.8,'blood');this.particles.at(-1).stain=this.rand()<.4;}
-  this.smear(pos,this.rand()*6.28,.3*scale);
+  this.smear(pos,this.rand()*6.28,.3*scale,'blood-impact');
  }
- bloodBurst(pos,direction,scale=1){this.blood(pos,direction.lengthSq()>.01?direction:new THREE.Vector3(0,1,0),Math.min(2,1.2*scale));for(let i=0;i<4;i++){const p=pos.clone().add(new THREE.Vector3((this.rand()-.5)*1.8,0,(this.rand()-.5)*1.8));this.smear(p,this.rand()*6.28,(.18+this.rand()*.35)*scale);}}
+ bloodBurst(pos,direction,scale=1){this.blood(pos,direction.lengthSq()>.01?direction:new THREE.Vector3(0,1,0),Math.min(2,1.2*scale));for(let i=0;i<4;i++){const p=pos.clone().add(new THREE.Vector3((this.rand()-.5)*1.8,0,(this.rand()-.5)*1.8));this.smear(p,this.rand()*6.28,(.18+this.rand()*.35)*scale,'blood-impact');}}
  bloodTrail(pos,velocity){for(let i=0;i<2;i++){this.emit(pos,velocity.clone().multiplyScalar(.15).add(new THREE.Vector3((this.rand()-.5)*.7,-.5,(this.rand()-.5)*.7)),0x8d1620,.07+this.rand()*.08,.6+this.rand()*.4,'blood');this.particles.at(-1).stain=this.rand()<.4;}}
- bloodLanding(pos,scale){this.smear(pos,this.rand()*6.28,scale);for(let i=0;i<5;i++){this.emit(pos,new THREE.Vector3((this.rand()-.5)*2,.6+this.rand(),(this.rand()-.5)*2),0x971d25,.07,.25,'blood');}}
+ bloodLanding(pos,scale){this.smear(pos,this.rand()*6.28,scale,'blood-impact');for(let i=0;i<5;i++){this.emit(pos,new THREE.Vector3((this.rand()-.5)*2,.6+this.rand(),(this.rand()-.5)*2),0x971d25,.07,.25,'blood');}}
  dust(pos,velocity,scale=1,outward=new THREE.Vector3(),options={}){
   const intensity=options.intensity??THREE.MathUtils.clamp(Math.hypot(velocity.x,velocity.z)/14,0,1),pivot=!!options.pivot;
   const v=outward.clone().multiplyScalar(.45+intensity*.65);v.y=.42+intensity*.48;
@@ -153,8 +168,9 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
   const ground=pos.clone();ground.y=terrainHeight(pos.x,pos.z)+.13;this.shockwave(ground,.55*scale);for(let i=0;i<6;i++)this.emit(ground,dir.clone().multiplyScalar(4+this.rand()*3).setY(.4),0xb39266,1.2*scale,1.1,'dust');
  }
  tread(pos,yaw,width){for(const side of [-1,1]){const x=pos.x+Math.cos(yaw)*width*side,z=pos.z-Math.sin(yaw)*width*side;this.dummy.position.set(x,terrainHeight(x,z)+.035,z);this.dummy.rotation.set(0,yaw,0);this.dummy.scale.set(1,1,1);this.dummy.updateMatrix();this.tracks.setMatrixAt(this.trackIndex++%3200,this.dummy.matrix);}this.tracks.count=Math.min(3200,this.trackIndex);this.tracks.instanceMatrix.needsUpdate=true;}
- scorch(pos,size){this.dummy.position.set(pos.x,terrainHeight(pos.x,pos.z)+.07,pos.z);this.dummy.rotation.set(0,this.rand()*6.28,0);this.dummy.scale.setScalar(size);this.dummy.updateMatrix();this.scorches.setMatrixAt(this.scorchIndex++%100,this.dummy.matrix);this.scorches.count=Math.min(100,this.scorchIndex);this.scorches.instanceMatrix.needsUpdate=true;}
- smear(pos,yaw,scale=1){this.dummy.position.copy(pos);this.dummy.rotation.set(0,yaw,0);this.dummy.scale.set((.8+this.rand()*.7)*scale,1,(1.5+this.rand()*2.5)*scale);this.dummy.updateMatrix();this.smears.setMatrixAt(this.smearIndex++%192,this.dummy.matrix);this.smears.count=Math.min(192,this.smearIndex);this.smears.instanceMatrix.needsUpdate=true;}
+ setSplat(mesh,slot,type){const attribute=mesh.geometry.getAttribute('aSplat');attribute.setX(slot,this.splatVariants.next(type));attribute.needsUpdate=true;}
+ scorch(pos,size){this.dummy.position.set(pos.x,terrainHeight(pos.x,pos.z)+.07,pos.z);this.dummy.rotation.set(0,this.rand()*6.28,0);this.dummy.scale.setScalar(size);this.dummy.updateMatrix();const slot=this.scorchIndex++%100;this.scorches.setMatrixAt(slot,this.dummy.matrix);this.setSplat(this.scorches,slot,'scorch');this.scorches.count=Math.min(100,this.scorchIndex);this.scorches.instanceMatrix.needsUpdate=true;}
+ smear(pos,yaw,scale=1,type='blood-smear'){this.dummy.position.copy(pos);this.dummy.rotation.set(0,yaw,0);this.dummy.scale.set((.8+this.rand()*.7)*scale,1,(type==='blood-smear'?1.5+this.rand()*2.5:1.2+this.rand()*.8)*scale);this.dummy.updateMatrix();const slot=this.smearIndex++%192;this.smears.setMatrixAt(slot,this.dummy.matrix);this.setSplat(this.smears,slot,type);this.smears.count=Math.min(192,this.smearIndex);this.smears.instanceMatrix.needsUpdate=true;}
  update(dt,prepare=true){
   for(const f of this.muzzleFlashes){if(f.life<=0)continue;if(f.presented)f.life=Math.max(0,f.life-dt);f.group.visible=f.life>0;f.material.uniforms.age.value=1-f.life/f.total;if(f.anchor&&f.group.visible){f.anchor.getWorldPosition(f.group.position);f.anchor.getWorldQuaternion(f.group.quaternion);}}
   for(const w of this.shockwaves){if(!w.mesh.visible)continue;w.age+=dt;const t=Math.min(1,w.age/w.duration);w.mesh.material.uniforms.age.value=t;w.mesh.scale.setScalar(w.size*(.3+10*Math.pow(t,.65)));if(t>=1)w.mesh.visible=false;}
@@ -168,7 +184,7 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
     p.v.x+=(windX-p.v.x)*follow;p.v.z+=(windZ-p.v.z)*follow;
     p.v.y+=((p.plume?2.5:1.3)*(1-progress*.65)-p.v.y)*(1-Math.exp(-dt*.5));
    }else{p.v.multiplyScalar(Math.exp(-dt*(p.flameJet?0:p.blastFire?3.5:p.kind==='ember'?.2:.65)));if(p.kind==='ember'||p.kind==='blood')p.v.y-=14*dt;else p.v.y+=.25*dt;}
-   p.p.addScaledVector(p.v,dt);if(p.trail||p.blastDust)p.p.y=Math.max(p.p.y,terrainHeight(p.p.x,p.p.z)+.08);if(p.kind==='blood'&&p.p.y<=terrainHeight(p.p.x,p.p.z)+.04){if(p.stain)this.smear(p.p,p.rotation,.08+this.rand()*.09);this.particlePool.remove(i);continue;}p.rotation+=p.spin*dt;
+   p.p.addScaledVector(p.v,dt);if(p.trail||p.blastDust)p.p.y=Math.max(p.p.y,terrainHeight(p.p.x,p.p.z)+.08);if(p.kind==='blood'&&p.p.y<=terrainHeight(p.p.x,p.p.z)+.04){if(p.stain)this.smear(p.p,p.rotation,.08+this.rand()*.09,'blood-droplets');this.particlePool.remove(i);continue;}p.rotation+=p.spin*dt;
   }
   if(prepare)this.prepare();
  }

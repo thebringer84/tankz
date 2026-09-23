@@ -1,3 +1,4 @@
+import {JEEP_COUNT} from '../src/config.js';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
@@ -25,7 +26,17 @@ try{
  await page.screenshot({path:'test-artifacts/garage.png'});
  await page.locator('[data-action="menu"]').click();await page.waitForFunction(()=>!tankz.ui.transitioning&&!tankz.game.showroomTransition);
  await page.locator('[data-action="deploy"]').click();
- await page.waitForFunction(()=>!tankz.game.loading&&tankz.game.mode==='playing',{timeout:120000});
+ await page.waitForFunction(()=>tankz.game.deploymentIntro,null,{timeout:120000});
+ const introMotion=await page.evaluate(()=>new Promise(resolve=>{
+  const g=tankz.game,start={...g.player.body.translation()};let frames=0,drift=0;
+  const sample=()=>{
+   if(!g.deploymentIntro){resolve({frames,drift});return;}
+   const p=g.player.body.translation();drift=Math.max(drift,Math.hypot(p.x-start.x,p.y-start.y,p.z-start.z));frames++;
+   requestAnimationFrame(sample);
+  };sample();
+ }));
+ assert.ok(introMotion.frames>1);assert.ok(introMotion.drift<1e-6,`tank must stay parked during intro: ${JSON.stringify(introMotion)}`);
+ await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',{timeout:120000});
  await page.waitForTimeout(1000);
  const start=await page.evaluate(()=>({position:{...tankz.game.player.body.translation()},time:tankz.game.time}));
  await page.mouse.move(960,350);
@@ -61,21 +72,21 @@ try{
  await page.screenshot({path:'test-artifacts/jeeps-and-ragdolls.png'});
  assert.ok(await page.evaluate(()=>tankz.game.fx.tracks.count>0),'driving must stamp tracks');
  // Exercise actual damage/reward/result transitions without requiring an AI full match.
- await page.evaluate(()=>{const g=tankz.game;for(const t of g.tanks.filter(t=>t.enemy&&!t.dead))g.hurt(t,100000,g.player);while(g.spawned<25){g.spawnEnemy(g.spawned);g.hurt(g.tanks.at(-1),100000,g.player);}});
+ await page.evaluate(count=>{const g=tankz.game;for(const t of g.tanks.filter(t=>t.enemy&&!t.dead))g.hurt(t,100000,g.player);while(g.spawned<count){g.spawnEnemy(g.spawned);g.hurt(g.tanks.at(-1),100000,g.player);}},JEEP_COUNT);
  assert.equal(await page.evaluate(()=>tankz.game.mode),'results');
- assert.equal(await page.evaluate(()=>tankz.game.kills),25);
+ assert.equal(await page.evaluate(()=>tankz.game.kills),JEEP_COUNT);
  await page.screenshot({path:'test-artifacts/results.png'});
  await page.locator('[data-action="deploy"]').click();
- await page.waitForFunction(()=>!tankz.game.loading&&tankz.game.mode==='playing',{timeout:120000});
+ await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',{timeout:120000});
  assert.equal(await page.evaluate(()=>tankz.game.kills),0);
  assert.equal(await page.evaluate(()=>tankz.game.player.hp),1000);
- assert.equal(await page.evaluate(()=>tankz.game.tanks.length),26);
+ assert.equal(await page.evaluate(()=>tankz.game.tanks.length),JEEP_COUNT+1);
  await page.keyboard.press('Escape');
  await page.locator('[data-action="leave"]').click();
  const remaining=await page.evaluate(()=>tankz.game.inventory.he);
  await page.reload();await page.waitForFunction(()=>window.tankz?.game?.running);
  assert.equal(await page.evaluate(()=>tankz.game.inventory.he),remaining,'spent ammunition must persist');
- assert.equal(await page.evaluate(()=>tankz.game.credits),4050,'purchases and match rewards must persist');
+ assert.equal(await page.evaluate(()=>tankz.game.credits),750+JEEP_COUNT*120+300,'purchases and match rewards must persist');
  console.log('Browser integration passed: rendering, static menus, tank selection, purchases, driving, Space fire, Q smoke, jeeps, ragdolls, tracks, pause, victory, rematch and persistence.');
  assert.deepEqual(errors,[],'No browser, shader, or local asset errors');
 } finally {await browser.close();}

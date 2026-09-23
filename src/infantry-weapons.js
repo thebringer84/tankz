@@ -1,9 +1,15 @@
 import * as THREE from 'three';
 import {box,cylinder} from './models.js';
+import {FRAG_GRENADE,clamp} from './config.js';
 export function equipSpecialist(crew,gun,muzzle,materials,weapon){
  for(const child of [...gun.children])if(child!==muzzle)gun.remove(child);
  const torso=crew.parts.find(p=>p.name==='torso').mesh,gear=new THREE.Group();crew.root.add(gear);
- if(weapon==='rpg'){
+ if(weapon==='grenadier'){
+  gun.name='Throwing hand';const grenade=new THREE.Mesh(new THREE.SphereGeometry(.105,8,6),materials.helmet);gun.add(grenade);gun.userData.grenade=grenade;
+  box(grenade,materials.steel,0,.105,0,.07,.065,.07);muzzle.position.set(0,0,.16);
+  for(let i=0;i<4;i++){const x=(i-1.5)*.10;box(gear,materials.canvas,x,.85-Math.abs(x)*.7,.17,.09,.14,.09);cylinder(gear,materials.helmet,x,.89-Math.abs(x)*.7,.19,.033,.11);}
+  box(gear,materials.rust,0,.57,.16,.32,.09,.08);
+ }else if(weapon==='rpg'){
   gun.name='RPG launcher';const tube=new THREE.Mesh(new THREE.CylinderGeometry(.105,.105,1.48,12,1,true).rotateX(Math.PI/2),materials.armor);tube.position.z=-.1;gun.add(tube);
   for(const z of [-.84,.64]){const rim=new THREE.Mesh(new THREE.TorusGeometry(.105,.022,6,12),materials.steel);rim.position.z=z;gun.add(rim);cylinder(gun,materials.dark,0,0,z*.96,.079,.025,'z');}
   for(const z of [-.5,-.12])cylinder(gun,materials.canvas,0,0,z,.12,.22,'z');
@@ -21,6 +27,23 @@ export function equipSpecialist(crew,gun,muzzle,materials,weapon){
  crew.root.updateMatrixWorld(true);torso.attach(gear);return gear;
 }
 export function animateWeapon(s,dt,pose=true){
+ if(s.weapon==='grenadier'){
+  const ready=s.ai?.sees&&!s.takingCover&&s.secondary===0,phase=clamp(s.aimTime/FRAG_GRENADE.windup,0,1);
+  s.weaponPose=ready?'windup':s.secondary>FRAG_GRENADE.reload-.25?'follow-through':s.secondary>.3?'reload':'carry';
+  if(!pose)return;
+  const hand=new THREE.Vector3(.3,.65,.18);
+  if(ready){if(phase<.5)hand.lerp(new THREE.Vector3(.32,1.3,-.14),phase*2);else hand.set(.32,1.3,-.14).lerp(new THREE.Vector3(.3,1.05,.55),(phase-.5)*2);}
+  else if(s.weaponPose==='follow-through')hand.set(.3,.96,.55);
+  s.gun.position.copy(hand);s.gun.rotation.set(0,0,0);s.gun.userData.grenade.visible=s.secondary<.3;
+  for(const side of [-1,1]){
+   const name=side<0?'L':'R',shoulder=new THREE.Vector3(side*.23,.87,0),elbow=new THREE.Vector3(side*.34,side>0?hand.y-.15:.65,.12),end=side>0?hand:new THREE.Vector3(-.08,.75,.25);
+   const upper=s.crew.parts.find(p=>p.name==='upperArm'+name).mesh,fore=s.crew.parts.find(p=>p.name==='forearm'+name).mesh;
+   upper.position.copy(shoulder).lerp(elbow,.5);upper.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),shoulder.clone().sub(elbow).normalize());upper.scale.y=shoulder.distanceTo(elbow);
+   fore.position.copy(elbow).lerp(end,.5);fore.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),end.clone().sub(elbow).normalize());fore.scale.z=elbow.distanceTo(end);
+   s.crew.links.find(l=>l[0]==='upperArm'+name)[2]=elbow.toArray();
+  }
+  return;
+ }
  if(s.weapon!=='rpg'&&s.weapon!=='flame')return;
  const rpg=s.weapon==='rpg',ready=s.ai?.sees&&!s.takingCover&&(rpg?s.secondary===0:!!s.flameFiring||s.secondary===0);
  s.weaponRaise=(s.weaponRaise||0)+((ready?1:0)-(s.weaponRaise||0))*(1-Math.exp(-dt*7));const b=s.weaponRaise;

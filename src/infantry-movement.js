@@ -13,7 +13,9 @@ export class InfantryMovement {
    for(let iz=Math.floor((Math.min(p.z,z)-radius)/CELL);iz<=Math.floor((Math.max(p.z,z)+radius)/CELL);iz++)
     for(let ix=Math.floor((Math.min(p.x,x)-radius)/CELL);ix<=Math.floor((Math.max(p.x,x)+radius)/CELL);ix++){const key=ix+','+iz;let bucket=this.hazards.get(key);if(!bucket)this.hazards.set(key,bucket=[]);bucket.push(hazard);}
   };
-  for(const t of g.tanks||[])add(t.body,t===g.player?16:7);
+  // Chassis footprint plus capsule clearance; velocity sweeps this region
+  // ahead of fast vehicles without waking everyone in a 16-metre circle.
+  for(const t of g.tanks||[])add(t.body,4*(t.cfg?.scale||1));
   for(const p of g.props||[])if(p.dynamic&&(!p.destroyed||p.crushed))add(p.body,6);
   for(const d of g.debris||[])add(d.body,3);
   for(const grenade of g.smokeGrenades?.items||[])add(grenade.body,3);
@@ -25,10 +27,10 @@ export class InfantryMovement {
   if(!bucket)return false;
   return bucket.some(h=>{const length=h.dx*h.dx+h.dz*h.dz,u=length?Math.max(0,Math.min(1,((p.x-h.x)*h.dx+(p.z-h.z)*h.dz)/length)):0;return (p.x-h.x-u*h.dx)**2+(p.z-h.z-u*h.dz)**2<h.radius*h.radius;});
  }
- urgent(s,p){return !!s.ai?.sees||this.physicalUrgent(s,p);}
+ urgent(s,p){return this.physicalUrgent(s,p);}
  tier(s,p,dt){
   const physical=this.physicalUrgent(s,p);
-  const wanted=s.ai?.sees||physical?0:(s.visibleToPlayer!==false||s.visibleToDrone||s.visibilityOpacity>.005)?1:2;
+  const wanted=physical?0:(s.visibleToPlayer!==false||s.visibleToDrone||s.visibilityOpacity>.005)?1:2;
   const state=s.movementState??={tier:wanted,quiet:0,segment:null,grounded:false};
   state.collisionQuiet=physical?0:Math.min(.5,(state.collisionQuiet??.5)+dt);
   if(wanted<state.tier){state.tier=wanted;state.quiet=0;state.segment=null;}
@@ -44,7 +46,7 @@ export class InfantryMovement {
   // while standing still. Recheck real support every tick and periodically run
   // the full controller. Physical hazards and any steering wake it immediately.
   const safe=state.collisionQuiet>=.5;
-  if(state.tier===0&&state.grounded&&motion.x===0&&motion.z===0&&safe){
+  if(state.grounded&&motion.x===0&&motion.z===0&&safe){
    const hold=state.hold;
    if(hold&&hold.left>=dt-1e-6&&p.distanceToSquared(hold.position)<1e-8){
     const hit=g.world.castRayAndGetNormal(new RAPIER.Ray({x:p.x,y:p.y+.5,z:p.z},DOWN),1.6,true,undefined,undefined,s.collider,s.body,filter);
@@ -54,7 +56,7 @@ export class InfantryMovement {
    }
   }
   const wasHolding=!!state.hold;state.hold=null;
-  if(safe&&!wasHolding&&(state.tier!==0||motion.x!==0||motion.z!==0)&&state.grounded&&state.retry===0){
+  if(safe&&!wasHolding&&(motion.x!==0||motion.z!==0)&&state.grounded&&state.retry===0){
    let segment=state.segment;
    if(segment&&(segment.left<dt-1e-6||Math.hypot(motion.x-segment.motion.x,motion.z-segment.motion.z)>.01||p.distanceToSquared(segment.expected)>.0025))segment=null;
    if(!segment){segment=this.validate(s,p,motion,state.tier===2?HORIZON:.1,nav,filter);state.segment=segment;if(!segment)state.retry=.15;}
@@ -67,7 +69,7 @@ export class InfantryMovement {
   controller.computeColliderMovement(s.collider,{x:motion.x*dt,y:-9*dt,z:motion.z*dt},undefined,undefined,filter);
   const move=controller.computedMovement();s.body.setNextKinematicTranslation(p.clone().add(move));
   state.grounded=controller.computedGrounded();s.speed=Math.hypot(move.x,move.z)/dt;
-  if(state.tier===0&&state.grounded&&motion.x===0&&motion.z===0&&safe)state.hold={position:p.clone().add(move),left:.1};
+  if(state.grounded&&motion.x===0&&motion.z===0&&safe)state.hold={position:p.clone().add(move),left:.1};
  }
  validate(s,p,motion,duration,nav,filter){
   const g=this.game,to=p.clone().addScaledVector(motion,duration);
