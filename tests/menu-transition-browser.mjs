@@ -19,6 +19,6 @@ try{
  assert.equal(await page.locator('[data-action="deploy"]').count(),0);
  await page.locator('[data-action="menu"]').click();
  assert.equal(await page.evaluate(()=>tankz.ui.screen),'menu');
- await page.locator('[data-action="deploy"]').click();await page.waitForFunction(()=>tankz.game.mode==='playing');assert.deepEqual(errors,[]);
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();await page.waitForFunction(()=>tankz.game.mode==='playing');assert.deepEqual(errors,[]);
  console.log('Camera interpolation, UI fades, preserved scene, reverse navigation, reduced motion and deployment passed.');
 }finally{await browser.close();}

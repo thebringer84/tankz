@@ -16,7 +16,7 @@ await page.route('**/src/main.js*',route=>route.fulfill({contentType:'applicatio
  `}));
 await page.addInitScript(()=>localStorage.setItem('tankz-settings',JSON.stringify({quality:'low',shake:0})));
 try{
- await page.goto(process.env.TANKZ_URL||'http://localhost:5174');await page.waitForFunction(()=>window.tankz?.game.running,{timeout:60000});await page.locator('[data-action="deploy"]').click();
+ await page.goto(process.env.TANKZ_URL||'http://localhost:5174');await page.waitForFunction(()=>window.tankz?.game.running,{timeout:60000});await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();
  await page.evaluate(()=>{const g=tankz.game;g.updateCamera(10);g.visibility.update(0,true);});
  await page.keyboard.press('e');
  assert.equal(await page.evaluate(()=>!!tankz.game.drone.active),true);

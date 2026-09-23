@@ -114,10 +114,6 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
   }
   this.dustWake(pos.clone().setY(surface(pos.x,pos.z)+.65),new THREE.Vector3(),scale,strength*softness,true);
  }
- canisterPellet(start,end){
-  const delta=end.clone().sub(start),length=delta.length();if(length<.01)return;delta.normalize();
-  for(let i=0;i<3;i++){const p=start.clone().addScaledVector(delta,length*(i+.5)/3);this.emit(p,delta.clone().multiplyScalar(8),0xffdd99,.035,.09,'ember');}
- }
  burningInfantry(pos,wounded=false){
   for(let i=0;i<3;i++){const p=pos.clone().add(new THREE.Vector3((this.rand()-.5)*.5,(wounded?0:.15)+this.rand()*.55,(this.rand()-.5)*.4));this.emit(p,new THREE.Vector3(0,1.2+this.rand(),0),i?0xff871f:0xffcf69,.32+this.rand()*.2,.35+this.rand()*.2,'fire');}
   this.emit(pos.clone().add(new THREE.Vector3(0,.7,0)),new THREE.Vector3(.15,1.5,0),0x383532,.4,.8,'smoke');

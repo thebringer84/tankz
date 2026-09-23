@@ -1,0 +1,32 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+await mkdir('test-artifacts',{recursive:true});
+const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-webgl']});
+const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
+page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+try{
+ await page.goto('http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game.running,null,{timeout:120000});
+ assert.equal(await page.evaluate(()=>tankz.game.selected),'scout');
+ await page.locator('[data-action="deploy"]').click();await page.waitForSelector('.mission-screen');
+ assert.equal(await page.evaluate(()=>tankz.game.mode),'menu');assert.equal(await page.locator('#mission-title').textContent(),'Dev Map');
+ await page.waitForFunction(()=>[...document.querySelectorAll('.mission-screen img')].every(i=>i.complete&&i.naturalWidth>0));
+ await page.screenshot({path:'test-artifacts/mission-overview.png'});
+ assert.equal(await page.locator('.mission-scroll,.mission-loadout,[data-action="mission-garage"]').count(),0);
+ for(const selector of ['.mission-tank','.mission-foreground','.mission-refinery'])assert.equal(await page.locator(selector).evaluate(e=>getComputedStyle(e).opacity),'1');
+ assert.equal(await page.locator('.mission-tank').evaluate(e=>getComputedStyle(e).animationName),'none');
+ const before=await page.locator('.mission-refinery').evaluate(e=>getComputedStyle(e).transform);
+ await page.waitForTimeout(900);
+ const after=await page.locator('.mission-refinery').evaluate(e=>getComputedStyle(e).transform);assert.notEqual(after,before,'art must move without input');
+ assert.equal(await page.locator('.mission-motion').count(),0);
+ await page.emulateMedia({reducedMotion:'reduce'});
+ assert.equal(await page.locator('.mission-refinery').evaluate(e=>getComputedStyle(e).animationName),'none');
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-artifacts/mission-mobile.png'});
+ assert.ok(await page.locator('[data-action="launch-mission"]').isVisible());assert.equal(await page.evaluate(()=>document.querySelector('.mission-screen').scrollHeight>innerHeight),false);
+ await page.setViewportSize({width:1440,height:1000});await page.keyboard.press('Escape');await page.waitForSelector('[data-action="deploy"]');
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();
+ await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',null,{timeout:120000});
+ const deployment=await page.evaluate(()=>({mission:tankz.game.missionId,tank:tankz.game.selected,jeeps:tankz.game.tanks.filter(t=>t.jeep).length}));assert.deepEqual(deployment,{mission:'dev-map',tank:'scout',jeeps:15});
+ await page.evaluate(()=>tankz.game.finish(false));assert.match(await page.locator('.results-panel').textContent(),/DEV MAP/);await page.locator('[data-action="deploy"]').click();await page.waitForSelector('.mission-screen',{timeout:120000});
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({deployment,assets:6,reducedMotion:true,autoplay:true,resultsReturn:true,errors}));
+}finally{await browser.close();}

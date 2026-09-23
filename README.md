@@ -29,7 +29,7 @@ Upload **all contents of `dist/`** to any static HTTP server. Relative asset pat
 
 ## Play
 
-Eliminate 25 enemy patrol jeeps within 15 minutes. Select a tank and load ammunition in the garage, then return to the main menu to deploy. Purchases, remaining ammunition and credits are stored on this browser. There are no real-money purchases.
+Eliminate 15 enemy patrol jeeps within 15 minutes. Kestrel is the default tank; change vehicles in the garage, then use Deploy to open the mission overview. AP and HE ammunition are unlimited. Earned credits are stored on this browser.
 
 | Control | Action |
 | --- | --- |
@@ -38,7 +38,7 @@ Eliminate 25 enemy patrol jeeps within 15 minutes. Select a tank and load ammuni
 | Mouse / touchpad | Choose turret bearing; range and elevation are automatic |
 | Left mouse **or Space** | Fire main gun; hold for repeated shots |
 | Right mouse | Fire coaxial gun |
-| 1 / 2 / 3 | AP / HE / canister ammunition |
+| 1 / 2 | AP / HE ammunition (both unlimited) |
 | Q | Deploy smoke; interrupts AI targeting |
 | Shift + W | Turbo boost (hold; recharges when released) |
 | R | Recover an overturned or stuck tank; 12-second cooldown |
@@ -53,12 +53,12 @@ The larger amber crosshair remains the predicted impact from the **current** gun
 
 - Three distinct tank configurations: Kestrel scout, Vanguard medium, Marauder heavy. Mass, acceleration, speed, armor, gun strength, reload, traverse and elevation rates differ.
 - Dynamic rigid-body chassis with six suspension probes, ground grip, differential steering, braking, hill jumps and physical collisions. Rocks use their transformed triangle meshes, so low sloped rocks can be crawled over; chassis undersides are bevelled to avoid snagging on low lips.
-- Fixed 60 Hz simulation. Each shell and coaxial round is a distinct Rapier rigid body, with gravity, continuous collision detection and an additional swept collision check. AP and HE are physical shells. Canister fires 48 cover-blocked pellet rays in a 20° cone, with damage falling to zero at 38 m, weak armor damage, and no explosive splash.
+- Fixed 60 Hz simulation. Each shell and coaxial round is a distinct Rapier rigid body, with gravity, continuous collision detection and an additional swept collision check. AP and HE are physical shells. Both have unlimited ammunition.
 - Direction-only mouse aiming with automatic target acquisition/range, followed by hull-pitch/roll compensation and inherited-velocity compensation in ballistic aiming. Traverse and elevation remain rate-limited. Predicted impact checks intervening physical cover.
 - Heightfield-style mesh terrain with matching triangle-mesh collision, generated desert albedo/normal/height maps, rotated multi-scale texture splatting, bedrock blending and broad color variation.
 - Procedural 3D vehicle meshes with generated armor paint; ruins with generated concrete, sandstone rocks, shrubs, movable rubble, explosive fuel drums, destructible wall segments and physical debris.
 - Bounded particle pool with generated smoke, fire, spark and crater textures; additive emissive fire/embers; short-lived pooled point lights; staged fire-to-smoke explosions; cannon muzzle flashes and ground-pressure dust; ground-conforming tread impressions and textured crater/scorch decals. Positional explosion audio, engine sound and adjustable camera shake.
-- Garage, ammunition purchasing, gameplay HUD/minimap, pause/settings and win/loss results. The showroom keeps gameplay physics frozen while the tank and its display platform rotate together.
+- Garage, unlimited AP/HE selection, gameplay HUD/minimap, pause/settings and win/loss results. The showroom keeps gameplay physics frozen while the tank and its display platform rotate together.
 - Light patrol jeep enemies, each with a visible driver and gunner. All 15 jeeps start the match, distributed across the expanded battlefield; each has 100 HP, and its machine gun fires roughly eight rounds per second for only 1.2 damage per hit. Direct main-gun hits destroy jeeps.
 - Jeep explosions eject two articulated 11-body ragdolls with spherical joints. Crew land physically; driving over grounded crew leaves a persistent red terrain smear. Ragdolls are capped at 16 and retire after 45 seconds; smears are capped at 64.
 - Visible paired tank tracks and speed-dependent dust emitted behind both tracks; jeeps kick up smaller tire dust plumes.
@@ -95,7 +95,7 @@ npm run build
 npm run test:browser
 ```
 
-The physics tests cover ballistic math, turret wraparound, suspension/acceleration/braking across all tanks, CCD against a thin wall, climbing an actual rock mesh, dune jumps and landings, impact convergence on a pitched/rolled hull, weak jeep bullets, crew ejection/landing and run-over smears. The browser integration check requires the dev server on port 5173 and a local Chrome installation (or `TANKZ_BROWSER=chromium` with Playwright Chromium installed). It checks rendering errors, garage purchases, menu stability, movement, Space firing, Q smoke, pause/resume and result flow. Screenshots go to ignored `test-artifacts/`.
+The physics tests cover ballistic math, turret wraparound, suspension/acceleration/braking across all tanks, CCD against a thin wall, climbing an actual rock mesh, dune jumps and landings, impact convergence on a pitched/rolled hull, weak jeep bullets, crew ejection/landing and run-over smears. The browser integration check requires the dev server on port 5173 and a local Chrome installation (or `TANKZ_BROWSER=chromium` with Playwright Chromium installed). It checks rendering errors, garage selection, menu stability, movement, Space firing, Q smoke, pause/resume and result flow. Screenshots go to ignored `test-artifacts/`.
 
 ### Visibility and patrols
 
@@ -313,3 +313,9 @@ Distant machine-gunners use one instanced body-and-weapon mesh with GPU leg anim
 ### Grenadiers
 
 Each patrol squad starts with a grenadier in place of one machine-gunner (25 grenadiers at the current deployment size). Grenadiers carry a grenade bandolier and use a visible overarm throw. They engage from 5–18 metres, approach distant targets and retreat when too close. A throw has a 0.3-second wind-up and 1.4-second cooldown, compared with the RPG's 1.15-second aim and 4.8-second reload. Frag grenades follow a gravity-driven arc, bounce off geometry, and detonate after a 1.6-second fuse with a 3.2-metre vehicle blast radius. They retain physical hitboxes, fog visibility, pooled projectile models and normal world cleanup. Run `node tests/grenadier-browser.mjs` to check the deployed specialist, animation, flight and fuse cleanup.
+
+### Mission deployment
+
+The Kestrel light recon tank is selected by default. Main menu **Deploy** opens mission selection. **Dev Map** is the first mission: clear all 15 machine-gun jeeps from enemy territory within 15 minutes. A single overview shows the objective and opposition while six generated scenery layers automatically drift horizontally at different speeds. There are no scrolling sections or loadout/refit links. **Launch mission** starts the existing deployment reveal; restarting from results returns to mission selection.
+
+Mission definitions live in `src/missions.js`. Generated artwork and its built-in image generation prompt set live in `public/assets/missions/dev-map/` (the jeep cutout is retained for future use). Motion is disabled by reduced-motion preferences. Escape returns to the menu. Run `node tests/missions-browser.mjs` for selection, automatic parallax, reduced motion, and launch checks.

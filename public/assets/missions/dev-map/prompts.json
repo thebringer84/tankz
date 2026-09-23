@@ -1,0 +1,33 @@
+{
+  "tool": "Built-in image_gen",
+  "prompts": [
+    {
+      "name": "sky",
+      "prompt": "Use case: stylized-concept. Asset for layered parallax mission briefing of TANKZ, a stylized low-poly desert armored combat game. Art-directed cinematic matte painting with angular rock planes, dusty ochre, desaturated olive, charcoal and pale amber dusk rim lighting; sophisticated restrained military concept art, not cartoon. No text, letters, logos, watermarks, interface or frame. Wide 16:9 opaque background plate. Vast dusty desert evening sky, pale amber glow low on the right horizon, muted blue-gray upper sky, very distant hazy sandstone ridges only along the lowest quarter. Empty atmospheric negative space in left half. No vehicles, buildings, foreground objects."
+    },
+    {
+      "name": "ridges",
+      "prompt": "Use case: stylized-concept. Asset for layered parallax mission briefing of TANKZ, a stylized low-poly desert armored combat game. Art-directed cinematic matte painting with angular rock planes, dusty ochre, desaturated olive, charcoal and pale amber dusk rim lighting; sophisticated restrained military concept art, not cartoon. No text, letters, logos, watermarks, interface or frame. Wide 16:9 transparent PNG parallax layer. Weathered ochre sandstone ridge stretching across lower half of canvas, highest mesa on right third, low dunes left. Warm dusk light from upper right, distant muted desaturated colors. Terrain fills bottom edge. Everything above the irregular ridge silhouette must be genuine transparent alpha, no sky or background."
+    },
+    {
+      "name": "refinery",
+      "prompt": "Use case: stylized-concept. Asset for layered parallax mission briefing of TANKZ, a stylized low-poly desert armored combat game. Art-directed cinematic matte painting with angular rock planes, dusty ochre, desaturated olive, charcoal and pale amber dusk rim lighting; sophisticated restrained military concept art, not cartoon. No text, letters, logos, watermarks, interface or frame. Wide 16:9 transparent PNG midground parallax layer. Abandoned desert refinery compound in lower right half: angular concrete walls, squat storage tanks, two tall narrow industrial towers, pipes, tiny distant machine gun patrol jeep silhouettes. Sandy ground strip along bottom. Upper half and left upper two thirds genuinely transparent alpha. Soft warm dusty lighting from right. Architectural silhouettes clean, no sky."
+    },
+    {
+      "name": "foreground",
+      "prompt": "Use case: stylized-concept. Asset for layered parallax mission briefing of TANKZ, a stylized low-poly desert armored combat game. Art-directed cinematic matte painting with angular rock planes, dusty ochre, desaturated olive, charcoal and pale amber dusk rim lighting; sophisticated restrained military concept art, not cartoon. No text, letters, logos, watermarks, interface or frame. Wide 16:9 transparent PNG near foreground layer. Dark angular desert boulders and wiry dried shrubs clustered only along the bottom quarter and right lower corner, a few broken fence stakes. Middle and upper three quarters genuinely transparent alpha. Olive charcoal rock shadows and warm amber rim light from right, graphic cinematic silhouette, no sky or backdrop."
+    },
+    {
+      "name": "tank",
+      "prompt": "Use case: stylized-concept. Asset for layered parallax mission briefing of TANKZ, a stylized low-poly desert armored combat game. Art-directed cinematic matte painting with angular rock planes, dusty ochre, desaturated olive, charcoal and pale amber dusk rim lighting; sophisticated restrained military concept art, not cartoon. No text, letters, logos, watermarks, interface or frame. Transparent PNG hero vehicle cutout, wide 3:2. One fictional olive-drab main battle tank, three-quarter front view, tracks clearly visible, cannon points toward upper right, vehicle faces right, grounded low camera angle. Entire vehicle contained in canvas with transparent margins. Angular low-poly silhouette with richly painted worn steel panels, strapped canvas gear, warm amber rim light from right and deep charcoal shadow, no ground plane, no background or cast shadow. Genuine transparent alpha."
+    },
+    {
+      "name": "jeep",
+      "prompt": "Use case: stylized-concept. Asset for layered parallax mission briefing of TANKZ, a stylized low-poly desert armored combat game. Art-directed cinematic matte painting with angular rock planes, dusty ochre, desaturated olive, charcoal and pale amber dusk rim lighting; sophisticated restrained military concept art, not cartoon. No text, letters, logos, watermarks, interface or frame. Transparent PNG enemy vehicle cutout, wide 3:2. One dusty olive open-top military patrol jeep with a mounted machine gun and two tiny helmeted occupants, three-quarter front view facing left. Chunky angular low-poly shapes, weathered dusty surfaces, amber light from right. Entire jeep contained with generous transparent margins. No ground plane or cast shadow, no background, genuine transparent alpha."
+    },
+    {
+      "name": "dust",
+      "prompt": "Use case: stylized-concept. Asset for layered parallax mission briefing of TANKZ, a stylized low-poly desert armored combat game. Art-directed cinematic matte painting with angular rock planes, dusty ochre, desaturated olive, charcoal and pale amber dusk rim lighting; sophisticated restrained military concept art, not cartoon. No text, letters, logos, watermarks, interface or frame. Wide 16:9 transparent PNG atmospheric overlay. A thin irregular veil of airborne amber desert dust sweeping horizontally across the lower half, wispy translucent curls at left and right, fine scattered dust motes. Very subtle airy sandy pigment. Most of image is genuinely transparent alpha, including upper half; semi-transparent dust, no background, no ground, no objects, no large opaque cloud."
+    }
+  ]
+}

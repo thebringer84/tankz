@@ -7,7 +7,7 @@ try{await page.goto(process.env.TANKZ_URL||'http://localhost:5173');await page.w
  // Every generated Kestrel map reaches the showroom material.
  assert.deepEqual(await page.evaluate(()=>{const a=tankz.game.player.armor;return [a.map,a.normalMap,a.roughnessMap,a.specularColorMap].map(t=>!!t?.image?.width);}),[true,true,true,true]);
  await still('test-artifacts/kestrel-front.png',[-4.5,3.2,-6,.35]);await still('test-artifacts/kestrel-side.png',[7.5,1.6,0,.2]);await still('test-artifacts/kestrel-rear.png',[5.2,2.6,6.5,.3]);
- await page.locator('[data-action="deploy"]').click();const low=await page.evaluate(()=>({...tankz.game.player.root.userData}));assert.equal(low.detail,'low');assert.ok(low.triangles<high.triangles*.3);
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();const low=await page.evaluate(()=>({...tankz.game.player.root.userData}));assert.equal(low.detail,'low');assert.ok(low.triangles<high.triangles*.3);
  assert.equal(await page.evaluate(()=>!!tankz.game.player.armor.bumpMap?.image),true);
  await page.waitForTimeout(400);await page.keyboard.press('Space');await page.waitForTimeout(200);await page.screenshot({path:'test-artifacts/kestrel-gameplay.png'});await still('test-artifacts/kestrel-gameplay-close.png',[4.5,3,5,.3]);
  assert.deepEqual(errors,[]);console.log('Kestrel detail selection, generated maps, rendering and deployment passed.',{high,low});}finally{await browser.close();}

@@ -19,7 +19,7 @@ await page.addInitScript(()=>localStorage.setItem('tankz-settings',JSON.stringif
 try{
  await page.goto(process.env.TANKZ_URL||'http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game.running,{timeout:60000});
  assert.equal(await page.evaluate(()=>tankz.game.frame.toString()),'function(){}','explicit-frame test harness must intercept Vite cache-busted entrypoints');
- await page.locator('[data-action="deploy"]').click();
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();
  await page.evaluate(()=>{const g=tankz.game;g.updateCamera(10);g.fx.updateHeading(g.player,true);g.fx.prepare(g.camera);g.presentation.render(0);});
  assert.equal(await page.evaluate(()=>tankz.game.fx.headingMarker.visible),true);
  await page.screenshot({path:'test-artifacts/hull-marker.png'});

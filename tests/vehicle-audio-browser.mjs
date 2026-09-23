@@ -7,11 +7,11 @@ const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 try{
  await page.goto('http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game.running);
- await page.locator('[data-action="deploy"]').click();await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',null,{timeout:120000});
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',null,{timeout:120000});
  const result=await page.evaluate(async()=>{
   const g=tankz.game;g.running=false;const a=g.audio,decoded=Object.entries(a.vehicleBuffers).map(([name,b])=>({name,duration:b.duration}));
   const types=[];
-  for(const type of ['light','medium','heavy']){
+  for(const type of ['scout','medium','heavy']){
    a.drive(0,true,type,18);a.drive(12,true,type,18);types.push({type:a.driveType,loops:a.driveLoops.length});a.cannon(0,type);
   }
   for(let i=0;i<10;i++)a.cannon(10,'heavy');

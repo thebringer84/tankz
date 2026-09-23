@@ -16,7 +16,7 @@ await page.route('**/src/main.js*',route=>route.fulfill({contentType:'applicatio
  `}));
 await page.addInitScript(()=>localStorage.setItem('tankz-settings',JSON.stringify({quality:'low',shake:0})));
 try{
- await page.goto(process.env.TANKZ_URL||'http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game.running,{timeout:60000});await page.locator('[data-action="deploy"]').click();
+ await page.goto(process.env.TANKZ_URL||'http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game.running,{timeout:60000});await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();
  await page.evaluate(()=>{const g=tankz.game;window.dustScenario=(kind)=>{
   const t=g.player;t.body.setTranslation({x:0,y:g.environment.surfaceHeight(0,19)+(kind==='landing'?8:1.05),z:19},true);t.body.setRotation({x:0,y:0,z:0,w:1},true);t.body.setLinvel({x:0,y:0,z:0},true);t.body.setAngvel({x:0,y:0,z:0},true);t.dustMotion=null;t.turboCharge=1;t.turboLocked=false;g.fx.clear();g.syncTank(t);
   const aim=t.root.position.clone();aim.z+=100;const cmd={throttle:kind==='trail'?1:0,steer:kind==='pivot'?1:0,aim,fire:false,secondary:false};let landedAt=-1;

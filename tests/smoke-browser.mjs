@@ -21,11 +21,11 @@ try{
  await page.locator('[data-action="tank"][data-value="heavy"]').click();
  assert.equal(await page.evaluate(()=>tankz.game.player.cfg.hp),1550);
  await page.locator('[data-action="tank"][data-value="medium"]').click();
- await page.locator('[data-action="buy"][data-value="he"]').click();
- assert.deepEqual(await page.evaluate(()=>({credits:tankz.game.credits,rounds:tankz.game.inventory.he})),{credits:750,rounds:8});
+ assert.equal(await page.locator('[data-action="buy"]').count(),0);
+ assert.equal(await page.evaluate(()=>tankz.game.credits),900);
  await page.screenshot({path:'test-artifacts/garage.png'});
  await page.locator('[data-action="menu"]').click();await page.waitForFunction(()=>!tankz.ui.transitioning&&!tankz.game.showroomTransition);
- await page.locator('[data-action="deploy"]').click();
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();
  await page.waitForFunction(()=>tankz.game.deploymentIntro,null,{timeout:120000});
  const introMotion=await page.evaluate(()=>new Promise(resolve=>{
   const g=tankz.game,start={...g.player.body.translation()};let frames=0,drift=0;
@@ -45,7 +45,7 @@ try{
  assert.ok(Math.hypot(moved.position.x-start.position.x,moved.position.z-start.position.z)>3,`W must move the tank: ${JSON.stringify({start,moved})}`);
  await page.keyboard.press('2');
  await page.keyboard.down('Space');
- await page.waitForFunction(()=>tankz.game.inventory.he<8,{timeout:5000});
+ await page.waitForFunction(()=>(tankz.game.player.shots||0)>0,{timeout:5000});
  await page.keyboard.up('Space');
  assert.equal(await page.evaluate(()=>tankz.game.smokeCooldown),0,'Space must not deploy smoke');
  await page.keyboard.press('q');
@@ -76,17 +76,17 @@ try{
  assert.equal(await page.evaluate(()=>tankz.game.mode),'results');
  assert.equal(await page.evaluate(()=>tankz.game.kills),JEEP_COUNT);
  await page.screenshot({path:'test-artifacts/results.png'});
- await page.locator('[data-action="deploy"]').click();
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();
  await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',{timeout:120000});
  assert.equal(await page.evaluate(()=>tankz.game.kills),0);
  assert.equal(await page.evaluate(()=>tankz.game.player.hp),1000);
  assert.equal(await page.evaluate(()=>tankz.game.tanks.length),JEEP_COUNT+1);
  await page.keyboard.press('Escape');
  await page.locator('[data-action="leave"]').click();
- const remaining=await page.evaluate(()=>tankz.game.inventory.he);
+
  await page.reload();await page.waitForFunction(()=>window.tankz?.game?.running);
- assert.equal(await page.evaluate(()=>tankz.game.inventory.he),remaining,'spent ammunition must persist');
- assert.equal(await page.evaluate(()=>tankz.game.credits),750+JEEP_COUNT*120+300,'purchases and match rewards must persist');
- console.log('Browser integration passed: rendering, static menus, tank selection, purchases, driving, Space fire, Q smoke, jeeps, ragdolls, tracks, pause, victory, rematch and persistence.');
+
+ assert.equal(await page.evaluate(()=>tankz.game.credits),900+JEEP_COUNT*120+300,'match rewards must persist');
+ console.log('Browser integration passed: rendering, static menus, tank selection, unlimited ammo, driving, Space fire, Q smoke, jeeps, ragdolls, tracks, pause, victory, rematch and persistence.');
  assert.deepEqual(errors,[],'No browser, shader, or local asset errors');
 } finally {await browser.close();}

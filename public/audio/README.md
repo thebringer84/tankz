@@ -22,7 +22,7 @@ The two fireballs alternate for jeep/vehicle and fuel explosions. The large expl
 
 ## Vehicle and weapon recordings
 
-Three engine bands crossfade with speed for each tank class. Slow/fast track layers fade in with movement (light tanks share medium tracks). Gear changes alternate two clips with a cooldown. Cannon discharge uses the artillery recording for AP, HE and canister. Loops blend their endpoints in decoded memory; original MP3s remain unchanged.
+Three engine bands crossfade with speed for each tank class. Slow/fast track layers fade in with movement (light tanks share medium tracks). Gear changes alternate two clips with a cooldown. Cannon discharge uses the artillery recording for AP and HE. Loops blend their endpoints in decoded memory; original MP3s remain unchanged.
 
 - `sfx/engine-heavy-fast.mp3` — original: `smartsound_TRANSPORTATION_TANK_Large_Engine_Fast_Speed_Steady_01.mp3`
 - `sfx/engine-heavy-cruise.mp3` — original: `smartsound_TRANSPORTATION_TANK_Large_Engine_Medium_Speed_Steady_01.mp3`

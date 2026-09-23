@@ -216,10 +216,10 @@ test('flamethrower contact ignites infantry while retaining direct damage to veh
  }finally{g.world.free();}
 });
 
-test('canister consumes one round, uses the cannon reload, and creates no explosive shell',()=>{
+test('AP and HE remain selectable and fire repeatedly without inventory or credits',()=>{
  const g=setup();try{
-  g.inventory={canister:2};g.ammo='canister';g.onEvent=()=>{};g.shake=0;g.fx.cannon=()=>{};let blasts=0;g.blast=()=>blasts++;
-  g.fire(g.player,false);assert.equal(g.inventory.canister,1);assert.equal(g.player.reload,g.player.cfg.reload);assert.equal(g.shells.length,0);assert.equal(blasts,0);
-  g.inventory.canister=0;g.fire(g.player,false);assert.equal(g.ammo,'ap');assert.equal(g.inventory.canister,0);
+  g.audio.click=()=>{};g.fx.cannon=()=>{};g.shake=0;g.credits=0;
+  for(const ammo of ['ap','he']){g.setAmmo(ammo);assert.equal(g.ammo,ammo);for(let i=0;i<3;i++){g.fire(g.player,false);assert.equal(g.ammo,ammo);assert.equal(g.player.reload,g.player.cfg.reload);}}
+  assert.equal(g.shells.length,6);assert.equal(g.credits,0);g.setAmmo('canister');assert.equal(g.ammo,'he');
  }finally{g.world.free();}
 });

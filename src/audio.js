@@ -43,7 +43,7 @@ export class AudioEngine {
   }
   drive(speed,active,type='medium',maxSpeed=18){
     if(!this.ctx)return;
-    const c=this.ctx,size=['light','medium','heavy'].includes(type)?type:'medium',ratio=Math.min(1,Math.abs(speed)/maxSpeed);
+    const c=this.ctx,size=type==='scout'?'light':['light','medium','heavy'].includes(type)?type:'medium',ratio=Math.min(1,Math.abs(speed)/maxSpeed);
     if(this.vehicleBuffers?.['engine-'+size+'-idle']){
       this.engineGain.gain.setTargetAtTime(0,c.currentTime,.1);
       if(this.driveType!==size){
@@ -66,7 +66,7 @@ export class AudioEngine {
     const voices=this.vehicleVoices??=new Set();if(voices.size>=6){const oldest=voices.values().next().value;oldest.stop();voices.delete(oldest);}
     const source=this.ctx.createBufferSource(),gain=this.ctx.createGain();source.buffer=this.vehicleBuffers[key];source.playbackRate.value=rate;gain.gain.value=level;source.connect(gain);gain.connect(this.sfxBus);voices.add(source);source.onended=()=>{voices.delete(source);source.disconnect();gain.disconnect();};source.start();return true;
   }
-  cannon(distance=0,type='medium'){if(!this.playVehicleShot('cannon',.55/(1+distance*.045),type==='heavy'?.88:type==='light'?1.12:1))this.boom(.55,distance);}
+  cannon(distance=0,type='medium'){if(!this.playVehicleShot('cannon',.55/(1+distance*.045),type==='heavy'?.88:(type==='light'||type==='scout')?1.12:1))this.boom(.55,distance);}
 
   boom(strength=1,distance=0){if(!this.ctx)return;const c=this.ctx,t=c.currentTime,g=c.createGain(),f=c.createBiquadFilter(),b=this.boomBuffer;const n=c.createBufferSource();n.buffer=b;f.type='lowpass';f.frequency.setValueAtTime(1600,t);f.frequency.exponentialRampToValueAtTime(90,t+.6);g.gain.value=Math.min(.7,strength*.32)/(1+distance*.045);n.connect(f);f.connect(g);g.connect(this.sfxBus);n.start();n.stop(t+.8);n.onended=()=>{n.disconnect();f.disconnect();g.disconnect();};const o=c.createOscillator(),og=c.createGain();o.frequency.setValueAtTime(100,t);o.frequency.exponentialRampToValueAtTime(24,t+.25);og.gain.setValueAtTime(g.gain.value*.8,t);og.gain.exponentialRampToValueAtTime(.001,t+.3);o.connect(og);og.connect(this.sfxBus);o.start();o.stop(t+.32);o.onended=()=>{o.disconnect();og.disconnect();};}
   explosion(strength=1,distance=0,variant='standard'){

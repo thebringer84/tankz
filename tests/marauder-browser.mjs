@@ -9,7 +9,7 @@ try{await page.goto(process.env.TANKZ_URL||'http://localhost:5173');await page.w
  // Every generated Kestrel map reaches the showroom material.
  assert.deepEqual(await page.evaluate(()=>{const a=tankz.game.player.armor;return [a.map,a.normalMap,a.roughnessMap,a.specularColorMap].map(t=>!!t?.image?.width);}),[true,true,true,true]);
  await still('test-artifacts/marauder-front.png',[-6.5,4.2,-8.5,.6]);await still('test-artifacts/marauder-side.png',[10,2.2,0,.5]);await still('test-artifacts/marauder-rear.png',[4.6,3,4.8,.6]);
- await page.locator('[data-action="deploy"]').click();const low=await page.evaluate(()=>({...tankz.game.player.root.userData}));assert.equal(low.detail,'low');assert.ok(low.triangles<high.triangles*.3);
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();const low=await page.evaluate(()=>({...tankz.game.player.root.userData}));assert.equal(low.detail,'low');assert.ok(low.triangles<high.triangles*.3);
  assert.equal(await page.evaluate(()=>!!tankz.game.player.armor.bumpMap?.image&&tankz.game.player.exhausts.length===2),true);
  await page.waitForTimeout(400);await page.keyboard.press('Space');await page.waitForTimeout(200);await page.screenshot({path:'test-artifacts/marauder-gameplay.png'});await still('test-artifacts/marauder-gameplay-close.png',[6.5,4.2,7.5,.5]);await still('test-artifacts/marauder-gameplay-lit.png',[-6.5,4.2,-7.5,.5]);
  assert.deepEqual(errors,[]);console.log('Marauder detail selection, generated maps, rendering and deployment passed.',{high,low});}finally{await browser.close();}

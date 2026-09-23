@@ -7,7 +7,7 @@ const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 try{
  await page.goto('http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game.running);
- await page.locator('[data-action="deploy"]').click();await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',null,{timeout:120000});
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',null,{timeout:120000});
  for(const [roll,variant] of [[.3,'skyward'],[.9,'crawl']]){
  const result=await page.evaluate(({roll,variant})=>{
   const g=tankz.game;g.running=false;g.mode='paused';g.fx.clear();for(const r of [...g.ragdolls.items])g.ragdolls.remove(r);

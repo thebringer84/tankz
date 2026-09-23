@@ -1,4 +1,5 @@
 import './style.css';
+import './mission-briefing.css';
 import {Game} from './game.js';
 import {UI} from './ui.js';
 import {profileGame} from './performance-profile.js';

@@ -9,7 +9,7 @@ page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 try{
  await page.goto('http://localhost:5173');
  await page.waitForFunction(()=>window.tankz?.game.running,null,{timeout:120000});
- await page.locator('[data-action="deploy"]').click();
+ await page.locator('[data-action="deploy"]').click();await page.locator('[data-action="launch-mission"]').click();
  await page.waitForFunction(()=>!tankz.game.loading&&!tankz.game.deploymentIntro&&tankz.game.mode==='playing',null,{timeout:120000});
  const result=await page.evaluate(async()=>{
   const g=tankz.game,{SPLAT_TYPES}=await import('/src/splat-atlas.js');
