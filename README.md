@@ -4,7 +4,7 @@ A self-hosted, single-player browser tank combat prototype built with Three.js, 
 
 ## Run
 
-Requires Node.js 20.19+ or 22.12+.
+Requires Node.js 22.12+ (Node.js 24 LTS is recommended for Cloudflare builds).
 
 ```sh
 npm ci
@@ -26,6 +26,21 @@ npm run build
 ```
 
 Upload **all contents of `dist/`** to any static HTTP server. Relative asset paths support hosting in a subdirectory. Serve JavaScript with its normal MIME type. Do not open `index.html` directly with `file://`. No backend, database or secret is needed. `npm run preview` serves the production build locally.
+
+### Cloudflare Workers
+
+The checked-in `wrangler.jsonc` serves `dist/` as static assets. No Worker script or
+Cloudflare Vite plugin is needed. In Cloudflare's Git-connected Workers build settings, use:
+
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+- Root directory: the repository root
+- Worker name: `tankz` (matching `wrangler.jsonc`)
+
+For a manual deployment after authenticating with Cloudflare, run `npm run deploy`.
+To validate the configuration without uploading, run `npm run build` followed by
+`npx wrangler deploy --dry-run`. Keep the Wrangler config in Git so deployment does
+not trigger Wrangler's automatic Vite setup.
 
 ## Play
 
