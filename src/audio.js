@@ -36,5 +36,16 @@ export class AudioEngine {
   }
   drive(speed,active){if(!this.ctx)return;this.engine.frequency.setTargetAtTime(28+Math.abs(speed)*2.3,this.ctx.currentTime,.1);this.engineGain.gain.setTargetAtTime(active?.018+Math.abs(speed)*.0015:0,this.ctx.currentTime,.15);}
   boom(strength=1,distance=0){if(!this.ctx)return;const c=this.ctx,t=c.currentTime,g=c.createGain(),f=c.createBiquadFilter(),b=this.boomBuffer;const n=c.createBufferSource();n.buffer=b;f.type='lowpass';f.frequency.setValueAtTime(1600,t);f.frequency.exponentialRampToValueAtTime(90,t+.6);g.gain.value=Math.min(.7,strength*.32)/(1+distance*.045);n.connect(f);f.connect(g);g.connect(this.sfxBus);n.start();n.stop(t+.8);n.onended=()=>{n.disconnect();f.disconnect();g.disconnect();};const o=c.createOscillator(),og=c.createGain();o.frequency.setValueAtTime(100,t);o.frequency.exponentialRampToValueAtTime(24,t+.25);og.gain.setValueAtTime(g.gain.value*.8,t);og.gain.exponentialRampToValueAtTime(.001,t+.3);o.connect(og);og.connect(this.sfxBus);o.start();o.stop(t+.32);o.onended=()=>{o.disconnect();og.disconnect();};}
+  // Short synthesized vocal cries; cap simultaneous voices for large crowds.
+  scream(distance=0,variant=0){
+    if(!this.ctx||distance>65||this.sfxVolume===0||(this.screamVoices||0)>=4)return;
+    const c=this.ctx,t=c.currentTime,duration=.75+variant*.12,voice=c.createOscillator(),gain=c.createGain(),vibrato=c.createOscillator(),depth=c.createGain();
+    voice.type='sawtooth';voice.frequency.setValueAtTime(310+variant*65,t);voice.frequency.exponentialRampToValueAtTime(530+variant*50,t+.18);voice.frequency.exponentialRampToValueAtTime(180+variant*35,t+duration);
+    vibrato.frequency.value=11+variant*2;depth.gain.value=24;vibrato.connect(depth);depth.connect(voice.frequency);
+    gain.gain.setValueAtTime(0,t);gain.gain.linearRampToValueAtTime(.075/(1+distance*.09),t+.07);gain.gain.exponentialRampToValueAtTime(.001,t+duration);
+    const filters=[750,1250,2700].map(frequency=>{const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=frequency;f.Q.value=5;voice.connect(f);f.connect(gain);return f;});
+    gain.connect(this.sfxBus);this.screamVoices=(this.screamVoices||0)+1;voice.start();vibrato.start();voice.stop(t+duration);vibrato.stop(t+duration);
+    voice.onended=()=>{voice.disconnect();vibrato.disconnect();depth.disconnect();filters.forEach(f=>f.disconnect());gain.disconnect();this.screamVoices--;};
+  }
   click(){if(!this.ctx)return;const o=this.ctx.createOscillator(),g=this.ctx.createGain();o.frequency.value=520;g.gain.setValueAtTime(.08,this.ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,this.ctx.currentTime+.06);o.connect(g);g.connect(this.sfxBus);o.start();o.stop(this.ctx.currentTime+.07);o.onended=()=>{o.disconnect();g.disconnect();};}
 }

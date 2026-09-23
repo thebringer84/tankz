@@ -22,7 +22,7 @@ export class InfantryMovement {
   for(const shell of g.shells||[])if(!shell.dead)add(shell.body,4);
  }
  physicalUrgent(s,p){
-  if(s.wounded||(s.recentDamageUntil||0)>(this.game.time||0))return true;
+  if(s.wounded||s.burning||(s.recentDamageUntil||0)>(this.game.time||0))return true;
   const bucket=this.hazards.get(Math.floor(p.x/CELL)+','+Math.floor(p.z/CELL));
   if(!bucket)return false;
   return bucket.some(h=>{const length=h.dx*h.dx+h.dz*h.dz,u=length?Math.max(0,Math.min(1,((p.x-h.x)*h.dx+(p.z-h.z)*h.dz)/length)):0;return (p.x-h.x-u*h.dx)**2+(p.z-h.z-u*h.dz)**2<h.radius*h.radius;});

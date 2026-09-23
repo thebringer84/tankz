@@ -10,10 +10,10 @@ export class InfantryDecisions {
   const budget=this.budget||{priority:96,fair:32};
   const visit=(s,slot)=>{
    this.pending.delete(s);
-   if(s.dead||s.wounded)return;
+   if(s.dead||s.wounded||s.burning)return;
    budget[slot]--;decide(s);
   };
-  for(const [s] of this.pending)if(s.dead||s.wounded)this.pending.delete(s);
+  for(const [s] of this.pending)if(s.dead||s.wounded||s.burning)this.pending.delete(s);
   for(let priority=0;priority<3&&budget.priority>0;priority++){
    for(const [s,rank] of this.pending){
     if(budget.priority<=0)break;

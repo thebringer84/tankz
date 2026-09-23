@@ -1,3 +1,4 @@
+import {igniteInfantry,updateBurning,poseBurning,BLAST_IGNITION_CHANCE} from './infantry-burning.js';
 import {skinCrew,restoreCrew} from './infantry-skin.js';
 import {PATROL_SITES} from './world-layout.js';
 import {equipSpecialist} from './infantry-weapons.js';
@@ -56,7 +57,7 @@ export class Infantry {
   for(const [s,goal] of this.routeJobs){
    if(budget.routeRequests<=0||(!this.sharedRoutes&&budget.routes<=0))break;
    budget.routeRequests--;
-   if(s.dead||s.wounded){this.routeJobs.delete(s);continue;}
+   if(s.dead||s.wounded||s.burning){this.routeJobs.delete(s);continue;}
    const searches=this.sharedRoutes?.searches||0;
    const path=this.sharedRoutes?this.sharedRoutes.route(s.body.translation(),goal,budget.routes>0):this.navigation.route(s.body.translation(),goal);
    if(path===null)continue;
@@ -67,7 +68,7 @@ export class Infantry {
   while(budget.cover>0&&this.coverJobs.size&&performance.now()<deadline){
    budget.cover--;
    const [s,search]=this.coverJobs.entries().next().value;this.coverJobs.delete(s);
-   if(s.dead||s.wounded||!s.ai.engaged||(s.movementState?.tier===2&&!s.ai.sees))continue;
+   if(s.dead||s.wounded||s.burning||!s.ai.engaged||(s.movementState?.tier===2&&!s.ai.sees))continue;
    const result=search.next();
    if(result.done){s.cover=result.value?.prop.destroyed?null:result.value;s.coverTimer=3+s.index*.15;s.replan=0;}
    else this.coverJobs.set(s,search);
@@ -103,7 +104,7 @@ export class Infantry {
   for(const squad of this.squads){const alive=squad.members.filter(s=>!s.dead);if(!alive.length)continue;const leader=alive[0];if(!squad.waypoint||flatDistance(leader.body.translation(),squad.goal)<4){squad.waypoint++;const angle=squad.phase+squad.waypoint*1.8;const desired=leader.ai.home.clone().add(new THREE.Vector3(Math.sin(angle)*32,0,Math.cos(angle)*32));this.navigation.refresh();const cell=this.navigation.freeNear(this.navigation.index(desired));if(cell>=0)squad.goal.copy(this.navigation.point(cell));}}
   for(const [phase,s] of g.soldiers.entries()){if(s.dead)continue;
    const dt=frameDt;
-   if(s.wounded)continue;const p=(s.updatePosition??=new THREE.Vector3()).copy(s.body.translation()),a=s.ai;
+   if(s.wounded||s.burning)continue;const p=(s.updatePosition??=new THREE.Vector3()).copy(s.body.translation()),a=s.ai;
    const tier=this.movement.tier(s,p,dt);s.secondary=Math.max(0,s.secondary-dt);s.coverTimer-=dt;s.replan-=dt;
    s.decisionElapsed=(s.decisionElapsed||0)+dt;
    const interval=a.sees||tier===0?3:tier===1?6:12;
@@ -125,7 +126,7 @@ export class Infantry {
   });
   for(const s of g.soldiers){if(s.dead)continue;
    const dt=frameDt;
-   if(s.wounded){this.updateWounded(s,dt);continue;}
+   if(s.burning){updateBurning(this,s,dt);continue;}if(s.wounded){this.updateWounded(s,dt);continue;}
    const p=s.updatePosition,a=s.ai;
    const motion=s.motion??(s.motion=new THREE.Vector3());
    this.movement.move(s,p,motion,dt,this.controller,this.navigation);
@@ -151,9 +152,10 @@ export class Infantry {
    if((s.weapon==='grenadier'&&flatDistance(p,a.lastKnown)>=FRAG_GRENADE.minRange&&flatDistance(p,a.lastKnown)<=FRAG_GRENADE.range||s.weapon==='rpg'||(s.weapon==='flame'&&flatDistance(p,a.lastKnown)<9))&&a.sees&&!s.takingCover&&s.secondary===0)motion.set(0,0,0);
    return motion;
  }
- pose(s){s.root.position.copy(s.body.translation());animateInfantry(s,0);}
+ pose(s){s.root.position.copy(s.body.translation());animateInfantry(s,0);poseBurning(s);}
+ ignite(s){return igniteInfantry(this,s);}
  wound(s,severity='leg',side='L'){
-  if(s.dead||s.wounded)return;this.crowd.restore(s);this.pose(s);restoreCrew(s.crew);const g=this.game;g.visibility?.release?.(s);s.wounded=true;s.crawlHeading=g.rand()*Math.PI*2;s.crawlPhase=g.rand()*Math.PI*2;s.crawlRate=3.4+g.rand()*2.2;s.crawlPace=.75+g.rand()*.5;s.crawlTurnIn=1.5+g.rand()*2.5;s.woundGrace=.7;s.woundType=severity;s.woundLife=severity==='lower'?4+g.rand()*2:18+g.rand()*8;s.bleedTimer=0;s.hp=Math.min(s.hp,severity==='lower'?5:14);s.gun.visible=false;s.flameFiring=false;s.aimTime=0;s.cover=null;
+  if(s.dead||s.wounded||s.burning)return;this.crowd.restore(s);this.pose(s);restoreCrew(s.crew);const g=this.game;g.visibility?.release?.(s);s.wounded=true;s.crawlHeading=g.rand()*Math.PI*2;s.crawlPhase=g.rand()*Math.PI*2;s.crawlRate=3.4+g.rand()*2.2;s.crawlPace=.75+g.rand()*.5;s.crawlTurnIn=1.5+g.rand()*2.5;s.woundGrace=.7;s.woundType=severity;s.woundLife=severity==='lower'?4+g.rand()*2:18+g.rand()*8;s.bleedTimer=0;s.hp=Math.min(s.hp,severity==='lower'?5:14);s.gun.visible=false;s.flameFiring=false;s.aimTime=0;s.cover=null;
   const names=severity==='lower'?['pelvis','thighL','shinL','thighR','shinR']:['thigh'+side,'shin'+side],parts=s.crew.parts.filter(p=>names.includes(p.name)),links=s.crew.links.filter(l=>names.includes(l[0])&&names.includes(l[1]));
   s.root.updateWorldMatrix(true,true);const detached=new THREE.Group();g.root.add(detached);for(const part of parts)detached.attach(part.mesh);const velocity=vec(g.player.body.linvel()).multiplyScalar(.12);velocity.y=1.5;
   const fragment=g.ragdolls.eject({root:detached,parts,links:links.map(([a,b,point])=>[a,b,s.crew.root.localToWorld(new THREE.Vector3(...point)).toArray()])},velocity);fragment.limb=true;fragment.bleedTimer=0;fragment.bleedDuration=.8;fragment.landed=false;detached.removeFromParent();
@@ -165,8 +167,8 @@ export class Infantry {
   s.crawlTurnIn-=dt;if(s.crawlTurnIn<=0){s.crawlHeading+=(g.rand()-.5)*1.4;s.crawlTurnIn=1.5+g.rand()*2.5;}
   const desired=s.crawlHeading;s.yaw=approachAngle(s.yaw,desired,dt*1.5);s.root.rotation.set(0,s.yaw,0);const speed=(s.woundType==='lower'?.28:.6)*(s.crawlPace??1)*(.45+.55*Math.max(0,Math.sin(s.crawlPhase||0)));const motion={x:Math.sin(s.yaw)*speed*dt,y:-4*dt,z:Math.cos(s.yaw)*speed*dt};this.controller.computeColliderMovement(s.collider,motion,undefined,undefined,c=>!g.entities.get(c.handle)?.projectile&&g.entities.get(c.handle)!==g.player);const move=this.controller.computedMovement();s.body.setNextKinematicTranslation(p.clone().add(move));s.body.setNextKinematicRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),s.yaw));s.speed=Math.hypot(move.x,move.z)/dt;animateInfantry(s,dt);s.bleedTimer-=dt;if(s.bleedTimer<=0){s.bleedTimer=.25;g.fx.bloodTrail?.(p,new THREE.Vector3());g.fx.smear(p,s.yaw,s.woundType==='lower'?.22:.13);}
  }
- flameAttack(s,dt){const g=this.game,{p,dir}=g.muzzle(s),range=11;const hit=g.world.castRay(new RAPIER.Ray(p,dir),range,true,undefined,undefined,undefined,s.body,c=>!g.entities.get(c.handle)?.projectile);const length=hit?hit.timeOfImpact:range;if(hit){const target=g.entities.get(hit.collider.handle);if(target&&target!==s)g.hurt(target,22*dt,s);}s.flameEmission=(s.flameEmission||0)-dt;if(s.flameEmission<=0){s.flameEmission+=.04;if(s.visibleToPlayer!==false){const prior=g.fx.enemyFire;g.fx.enemyFire=true;try{g.fx.flameStream?.(p,dir,length);}finally{g.fx.enemyFire=prior;}}}}
- sync(){const g=this.game,tank=g.player;for(const s of g.soldiers){if(s.dead)continue;s.root.position.copy(s.body.translation());if(!tank||tank.dead||!tank.grounded||Math.abs(tank.speed)<.65)continue;const sp=s.body.translation(),tp=tank.body.translation(),radius2=(1.65**2+2.15**2+1.5**2)*tank.cfg.scale**2;if((sp.x-tp.x)**2+(sp.y-tp.y)**2+(sp.z-tp.z)**2>radius2)continue;const local=vec(sp).sub(tp).applyQuaternion(new THREE.Quaternion().copy(tank.body.rotation()).invert());if(Math.abs(local.x)<1.65*tank.cfg.scale&&Math.abs(local.z)<2.15*tank.cfg.scale&&Math.abs(local.y)<1.5*tank.cfg.scale){if(s.wounded&&s.woundGrace>0)continue;if(!s.wounded&&s.weapon!=='flame'&&Math.abs(local.x)>1.05*tank.cfg.scale)this.wound(s,Math.abs(tank.speed)>8&&g.rand()<.35?'lower':'leg',local.x>0?'L':'R');else this.kill(s,new THREE.Vector3(),true);}}}
+ flameAttack(s,dt){const g=this.game,{p,dir}=g.muzzle(s),range=11;const hit=g.world.castRay(new RAPIER.Ray(p,dir),range,true,undefined,undefined,undefined,s.body,c=>!g.entities.get(c.handle)?.projectile);const length=hit?hit.timeOfImpact:range;if(hit){const target=g.entities.get(hit.collider.handle);if(target&&target!==s){if(target.infantry)this.ignite(target);else g.hurt(target,22*dt,s);}}s.flameEmission=(s.flameEmission||0)-dt;if(s.flameEmission<=0){s.flameEmission+=.04;if(s.visibleToPlayer!==false){const prior=g.fx.enemyFire;g.fx.enemyFire=true;try{g.fx.flameStream?.(p,dir,length);}finally{g.fx.enemyFire=prior;}}}}
+ sync(){const g=this.game,tank=g.player;for(const s of g.soldiers){if(s.dead)continue;s.root.position.copy(s.body.translation());if(!tank||tank.dead||!tank.grounded||Math.abs(tank.speed)<.65)continue;const sp=s.body.translation(),tp=tank.body.translation(),radius2=(1.65**2+2.15**2+1.5**2)*tank.cfg.scale**2;if((sp.x-tp.x)**2+(sp.y-tp.y)**2+(sp.z-tp.z)**2>radius2)continue;const local=vec(sp).sub(tp).applyQuaternion(new THREE.Quaternion().copy(tank.body.rotation()).invert());if(Math.abs(local.x)<1.65*tank.cfg.scale&&Math.abs(local.z)<2.15*tank.cfg.scale&&Math.abs(local.y)<1.5*tank.cfg.scale){if(s.wounded&&s.woundGrace>0)continue;if(!s.wounded&&!s.burning&&s.weapon!=='flame'&&Math.abs(local.x)>1.05*tank.cfg.scale)this.wound(s,Math.abs(tank.speed)>8&&g.rand()<.35?'lower':'leg',local.x>0?'L':'R');else this.kill(s,new THREE.Vector3(),true);}}}
  kill(s,impulse=new THREE.Vector3(0,2,0),crushed=false,dismember=false){if(s.dead)return;this.crowd.restore(s);this.pose(s);s.dead=true;const g=this.game;g.visibility?.release?.(s);const detonate=s.weapon==='flame',center=vec(s.body.translation());g.entities.delete(s.collider.handle);g.world.removeRigidBody(s.body);restoreCrew(s.crew);s.root.updateWorldMatrix(true,true);s.crew.parts.find(part=>part.name==='forearmR').mesh.attach(s.gun);
   const runOver=crushed?{yaw:g.player.yaw,scale:g.player.cfg.scale}:null;
   if(crushed){impulse=vec(g.player.body.linvel()).multiplyScalar(.2);impulse.y=-3;}
@@ -175,5 +177,5 @@ export class Infantry {
   if(detonate){g.fx.blood?.(center,new THREE.Vector3(0,1,0),2.2);g.blast(center,1.45,'metal','fuel');for(const target of [...g.tanks,...g.props]){if(target.dead||target.destroyed)continue;const distance=vec(target.body.translation()).distanceTo(center);if(distance<5.5)g.hurt(target,75*(1-distance/5.5),s);}}
  }
 
- blast(point,radius,power){for(const s of this.game.soldiers){if(s.dead)continue;const direction=vec(s.body.translation()).sub(point),distance=direction.length();if(distance>=radius)continue;const strength=1-distance/radius;s.hp-=power*strength;s.recentDamageUntil=(this.game.time||0)+1;if(s.hp<=0)this.kill(s,direction.normalize().multiplyScalar(4+strength*8).add(new THREE.Vector3(0,4+strength*5,0)));else{s.ai.engaged=true;s.ai.state='investigate';s.ai.lastKnown.copy(point);s.coverTimer=0;}}}
+ blast(point,radius,power){for(const s of this.game.soldiers){if(s.dead)continue;const direction=vec(s.body.translation()).sub(point),distance=direction.length();if(distance>=radius)continue;const strength=1-distance/radius;s.hp-=power*strength;s.recentDamageUntil=(this.game.time||0)+1;if(s.hp<=0)this.kill(s,direction.normalize().multiplyScalar(4+strength*8).add(new THREE.Vector3(0,4+strength*5,0)));else{if(!s.burning&&this.game.rand()<BLAST_IGNITION_CHANCE)this.ignite(s);s.ai.engaged=true;s.ai.state='investigate';s.ai.lastKnown.copy(point);s.coverTimer=0;}}}
 }

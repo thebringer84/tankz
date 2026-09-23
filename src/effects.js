@@ -114,6 +114,10 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
   }
   this.dustWake(pos.clone().setY(surface(pos.x,pos.z)+.65),new THREE.Vector3(),scale,strength*softness,true);
  }
+ burningInfantry(pos,wounded=false){
+  for(let i=0;i<3;i++){const p=pos.clone().add(new THREE.Vector3((this.rand()-.5)*.5,(wounded?0:.15)+this.rand()*.55,(this.rand()-.5)*.4));this.emit(p,new THREE.Vector3(0,1.2+this.rand(),0),i?0xff871f:0xffcf69,.32+this.rand()*.2,.35+this.rand()*.2,'fire');}
+  this.emit(pos.clone().add(new THREE.Vector3(0,.7,0)),new THREE.Vector3(.15,1.5,0),0x383532,.4,.8,'smoke');
+ }
  flameStream(pos,dir,length){
   const reach=Math.max(.05,length),side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();
   for(let i=0;i<5;i++){const offset=Math.min(reach*.2,i*.08),p=pos.clone().addScaledVector(dir,offset),v=dir.clone().multiplyScalar(20);this.emit(p,v,i%2?0xff871f:0xffc46a,.48+this.rand()*.26,Math.min(.55,(reach-offset)/20),'fire');const particle=this.particles.at(-1);particle.flameJet=true;particle.jetDir=dir.clone();particle.jetSide=side.clone();particle.phase=this.rand()*6.28;}

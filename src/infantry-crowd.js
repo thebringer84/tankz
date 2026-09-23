@@ -61,7 +61,7 @@ export function crowdGeometry(s){
 export class InfantryCrowd {
  constructor(game){this.game=game;this.enabled=true;this.mesh=null;this.capacity=0;this.matrix=new THREE.Matrix4();this.rotation=new THREE.Quaternion();this.scale=new THREE.Vector3(1,1,1);this.position=new THREE.Vector3();this.axis=new THREE.Vector3(0,1,0);}
  eligible(s){
-  if(!this.enabled||s.dead||s.wounded||s.weapon!=='mg'||!s.crew.skin||this.game.autoTarget===s||(s.recentDamageUntil||0)>this.game.time)return false;
+  if(!this.enabled||s.dead||s.wounded||s.burning||s.weapon!=='mg'||!s.crew.skin||this.game.autoTarget===s||(s.recentDamageUntil||0)>this.game.time)return false;
   const player=this.game.player?.body.translation();if(!player)return false;
   const p=s.body.translation(),distance=Math.hypot(p.x-player.x,p.z-player.z);
   return distance>(s.crowdBatched?22:30);
@@ -95,7 +95,7 @@ export class InfantryCrowd {
    if(s.crowdBatched&&!batched&&!s.dead&&!s.wounded)g.infantry?.pose(s);
    s.crowdBatched=batched;
    if(s.crew.skin)s.crew.skin.mesh.visible=!batched;
-   if(!s.wounded&&!s.dead)s.gun.visible=!batched;
+   if(!s.wounded&&!s.dead)s.gun.visible=!batched&&!s.burning;
    const opacity=s.visibilityOpacity??(s.visibleToPlayer===false?0:1);
    if(!batched||opacity<=.005||!s.root.visible)continue;
    this.position.copy(s.body.translation());
@@ -107,7 +107,7 @@ export class InfantryCrowd {
   this.mesh.count=count;this.mesh.instanceMatrix.needsUpdate=true;this.motion.needsUpdate=true;this.opacity.needsUpdate=true;
  }
  restore(s){
-  s.crowdBatched=false;if(s.crew.skin)s.crew.skin.mesh.visible=true;if(!s.wounded)s.gun.visible=true;
+  s.crowdBatched=false;if(s.crew.skin)s.crew.skin.mesh.visible=true;if(!s.wounded&&!s.burning)s.gun.visible=true;
  }
  dispose(){if(!this.mesh)return;this.mesh.removeFromParent();this.mesh.geometry.dispose();this.mesh.material.dispose();this.mesh.customDepthMaterial.dispose();this.mesh.customDistanceMaterial.dispose();this.mesh.dispose();this.mesh=null;}
 }
