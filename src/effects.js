@@ -1,28 +1,32 @@
+import {ParticlePool} from './particle-pool.js';
 import {createCannonProjectile} from './projectile-visuals.js';
 import {DustRenderer} from './vehicle-dust.js';
 import * as THREE from 'three';
 import {terrainHeight,seededRandom,MAP_SIZE,TERRAIN_SEGMENTS,AMMO} from './config.js';
 export class Effects {
  constructor(scene,smokeTexture,textures={}){
-  this.scene=scene;this.time=0;this.particles=[];this.decals=[];this.screens=[];this.rand=seededRandom(414);this.max=3600;this.projectileTemplates=Object.entries(AMMO).map(([key,ammo])=>{const root=createCannonProjectile(ammo,key);root.visible=false;scene.add(root);return root;});
-  const geo=new THREE.BufferGeometry();for(const [key,width] of [['position',3],['aColor',3],['aSize',1],['aAlpha',1],['aKind',1],['aRotation',1],['aAge',1]])geo.setAttribute(key,new THREE.BufferAttribute(new Float32Array(this.max*width),width));
-  const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{smokeTex:{value:smokeTexture},fireTex:{value:textures.fire||smokeTexture},sparkTex:{value:textures.sparks||smokeTexture},hotPass:{value:0},time:{value:0}},vertexShader:`attribute float aAge;varying float vAge;attribute vec3 aColor;attribute float aSize;attribute float aAlpha;attribute float aKind;attribute float aRotation;varying vec3 vColor;varying float vAlpha;varying float vKind;varying float vRotation;void main(){vAge=aAge;vColor=aColor;vAlpha=aAlpha;vKind=aKind;vRotation=aRotation;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=min(300.,aSize*740./max(1.,-mv.z));gl_Position=projectionMatrix*mv;}`,fragmentShader:`uniform sampler2D smokeTex;uniform sampler2D fireTex;uniform sampler2D sparkTex;uniform float hotPass,time;varying float vAge;varying vec3 vColor;varying float vAlpha;varying float vKind;varying float vRotation;void main(){bool hot=vKind>.5&&vKind<3.5;if((hotPass>.5)!=hot)discard;vec2 p=gl_PointCoord-.5;float c=cos(vRotation),s=sin(vRotation);vec2 uv=mat2(c,-s,s,c)*p+.5;if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.)discard;if(!hot){vec2 flow=vec2(sin(uv.y*13.+time*.7+vRotation),cos(uv.x*11.-time*.5+vRotation));uv+=flow*.018*sin(vAge*3.14159);}
+  this.scene=scene;this.time=0;this.particles=[];this.decals=[];this.screens=[];this.rand=seededRandom(414);this.max=3600;this.particlePool=new ParticlePool(this.particles,this.max);this.projectileTemplates=Object.entries(AMMO).map(([key,ammo])=>{const root=createCannonProjectile(ammo,key);root.visible=false;scene.add(root);return root;});
+  const plane=new THREE.PlaneGeometry(1,1),geo=new THREE.InstancedBufferGeometry();geo.index=plane.index;geo.attributes={...plane.attributes};geo.instanceCount=0;for(const [key,width] of [['aCenter',3],['aColor',3],['aSize',1],['aAlpha',1],['aKind',1],['aRotation',1],['aAge',1]])geo.setAttribute(key,new THREE.InstancedBufferAttribute(new Float32Array(this.max*width),width).setUsage(THREE.DynamicDrawUsage));
+  const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{smokeTex:{value:smokeTexture},fireTex:{value:textures.fire||smokeTexture},sparkTex:{value:textures.sparks||smokeTexture},hotPass:{value:0},time:{value:0}},vertexShader:`attribute vec3 aCenter;varying vec2 vUv;attribute float aAge;varying float vAge;attribute vec3 aColor;attribute float aSize;attribute float aAlpha;attribute float aKind;attribute float aRotation;varying vec3 vColor;varying float vAlpha;varying float vKind;varying float vRotation;void main(){vAge=aAge;vColor=aColor;vAlpha=aAlpha;vKind=aKind;vRotation=aRotation;vUv=uv;vec4 mv=modelViewMatrix*vec4(aCenter,1.);mv.xy+=position.xy*aSize;gl_Position=projectionMatrix*mv;}`,fragmentShader:`varying vec2 vUv;uniform sampler2D smokeTex;uniform sampler2D fireTex;uniform sampler2D sparkTex;uniform float hotPass,time;varying float vAge;varying vec3 vColor;varying float vAlpha;varying float vKind;varying float vRotation;void main(){bool hot=vKind>.5&&vKind<3.5;if((hotPass>.5)!=hot)discard;vec2 p=vUv-.5;float c=cos(vRotation),s=sin(vRotation);vec2 uv=mat2(c,-s,s,c)*p+.5;if(uv.x<0.||uv.y<0.||uv.x>1.||uv.y>1.)discard;if(!hot){vec2 flow=vec2(sin(uv.y*13.+time*.7+vRotation),cos(uv.x*11.-time*.5+vRotation));uv+=flow*.018*sin(vAge*3.14159);}
 vec4 texel=texture2D(smokeTex,clamp(uv,0.,1.));if(vKind<-.5){float radius=length(p);float detail=texture2D(smokeTex,clamp(uv,0.,1.)).a;float envelope=(1.-smoothstep(.12,.5,radius));texel.a=envelope*mix(.26,1.,detail);texel.rgb=vec3(.42+detail*.58);}
 if(vKind>.5&&vKind<1.5){texel=texture2D(fireTex,uv);texel.rgb*=mix(vec3(1.25,1.05,.8),vec3(.75,.23,.045),smoothstep(.02,.7,vAge));texel.a*=1.-vAge*.6;}if(vKind>1.5&&vKind<2.5)texel=texture2D(sparkTex,uv);if(vKind>2.5&&vKind<3.5){float a=1.-smoothstep(.05,.48,length(p));texel=vec4(1.,.7,.25,a);}if(vKind>3.5){texel=vec4(1.,1.,1.,1.-smoothstep(.12,.47,length(p)));}vec3 color=hot?texel.rgb*vColor*1.25:vColor*(.48+texel.r*.65+uv.y*.18);float alpha=hot?texel.a*vAlpha:1.-exp(-texel.a*vAlpha*1.55);
 if(!hot)alpha*=1.-smoothstep(.36,.5,max(abs(uv.x-.5),abs(uv.y-.5)));
 gl_FragColor=vec4(color,alpha);
 #include <tonemapping_fragment>
 #include <colorspace_fragment>}`});
-  this.points=new THREE.Points(geo,mat);this.points.frustumCulled=false;scene.add(this.points);
-  const hotMat=mat.clone();hotMat.uniforms.hotPass.value=1;hotMat.blending=THREE.AdditiveBlending;hotMat.toneMapped=false;this.hotPoints=new THREE.Points(geo,hotMat);this.hotPoints.frustumCulled=false;this.hotPoints.renderOrder=1;scene.add(this.hotPoints);
-  this.lights=Array.from({length:6},()=>{const light=new THREE.PointLight(0xff913c,0,28,2);scene.add(light);return {light,life:0,total:1,power:0};});
+  this.points=new THREE.Mesh(geo,mat);this.points.frustumCulled=false;scene.add(this.points);
+  const hotMat=mat.clone();hotMat.uniforms.hotPass.value=1;hotMat.blending=THREE.AdditiveBlending;hotMat.toneMapped=false;this.hotPoints=new THREE.Mesh(geo.clone(),hotMat);this.hotPoints.frustumCulled=false;this.hotPoints.renderOrder=1;scene.add(this.hotPoints);
+  this.flashLightsEnabled=true; // Diagnostic switch; keep the light count stable when comparing combat.
+  this.machineGunLightsEnabled=false; // Rapid fire uses emissive flashes instead of repeated scene lighting.
+  this.lights=Array.from({length:6},()=>{const light=new THREE.PointLight(0xff913c,0,28,2);return {light,life:0,total:1,power:0};});
   const flashGeo=new THREE.PlaneGeometry(1,1).rotateX(Math.PI/2).translate(0,0,.5);
   this.muzzleFlashes=Array.from({length:24},()=>{const material=new THREE.ShaderMaterial({uniforms:{age:{value:0},seed:{value:0},cannon:{value:0},blastTex:{value:textures.cannonMuzzle||textures.fire||smokeTexture}},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,toneMapped:false,vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`uniform float age,seed,cannon;uniform sampler2D blastTex;varying vec2 vUv;void main(){
 if(cannon>.5){vec2 uv=vec2((vUv.x-.5)/(1.+age*.3)+.5,vUv.y);uv.x+=sin(uv.y*21.+seed+age*8.)*.009*age;vec4 plume=texture2D(blastTex,uv);float fade=pow(1.-age,1.35);vec3 heat=mix(vec3(2.8,2.5,1.8),vec3(1.15,.48,.15),age);float padding=smoothstep(0.,.08,vUv.y)*(1.-smoothstep(.93,1.,vUv.y));gl_FragColor=vec4(plume.rgb*heat,plume.a*fade*padding*.8);return;}
 float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float turbulence=.8+.2*sin(t*39.+seed+sin(vUv.x*27.)*2.);float a=(1.-smoothstep(w*.25,w*turbulence,edge))*pow(1.-t,.6)*pow(1.-age,1.8);vec3 color=mix(vec3(3.,2.5,1.5),vec3(1.5,.3,.035),clamp(t*.9+age*.6,0.,1.));gl_FragColor=vec4(color,a);
 #include <colorspace_fragment>
 }`});const group=new THREE.Group();for(let i=0;i<2;i++){const mesh=new THREE.Mesh(flashGeo,material);mesh.rotation.z=i*Math.PI/2;group.add(mesh);}group.visible=false;scene.add(group);return {group,material,life:0,total:1,anchor:null};});
-  this.rocketLights=Array.from({length:2},()=>{const light=new THREE.PointLight(0xff9a3d,0,5,2);scene.add(light);return light;});
+  this.rocketLights=Array.from({length:2},()=>{const light=new THREE.PointLight(0xff9a3d,0,5,2);return light;});
+  this.setLightBudget(4);
   const groundGLSL=`uniform sampler2D terrainSurface;uniform float useTerrainSurface,mapSize,terrainSegments;float groundBaseY(vec2 p){float x=p.x,z=p.y;return .65*sin(x*.058)*cos(z*.047)+.35*sin(x*.15+z*.11)+5.8*exp(-(pow(x-23.,2.)/180.+pow(z-8.,2.)/360.))+4.7*exp(-(pow(x+34.,2.)/240.+pow(z+29.,2.)/180.))+3.8*exp(-(pow(x-5.,2.)/320.+pow(z+52.,2.)/140.))+4.*exp(-(pow(x+48.,2.)/230.+pow(z-49.,2.)/240.))+2.7*exp(-(pow(x+12.,2.)/50.+pow(z-3.,2.)/20.));}`;
   const surfaceGLSL=groundGLSL+`float groundY(vec2 p){if(useTerrainSurface<.5)return groundBaseY(p);vec2 cell=clamp((p+mapSize*.5)/(mapSize/terrainSegments),vec2(0.),vec2(terrainSegments-.001)),f=fract(cell),uv=(floor(cell)+.5)/(terrainSegments+1.);float a=texture2D(terrainSurface,uv).r,b=texture2D(terrainSurface,uv+vec2(1./(terrainSegments+1.),0.)).r,c=texture2D(terrainSurface,uv+vec2(0.,1./(terrainSegments+1.))).r,d=texture2D(terrainSurface,uv+vec2(1./(terrainSegments+1.))).r;return f.x+f.y<=1.?a+(b-a)*f.x+(c-a)*f.y:d+(c-d)*(1.-f.x)+(b-d)*(1.-f.y);}`;
   this.surfaceUniforms={mapSize:{value:MAP_SIZE},terrainSegments:{value:TERRAIN_SEGMENTS,AMMO},terrainSurface:{value:null},useTerrainSurface:{value:0}};
@@ -49,7 +53,22 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
   this.smears=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1,8,8).rotateX(-Math.PI/2),smearMat,192);this.smears.renderOrder=-2;this.smears.count=0;this.smears.frustumCulled=false;this.smearIndex=0;scene.add(this.smears);
 
  }
- emit(p,v,color,size,life,kind='dust',delay=0){if(this.particles.length>=this.max)this.particles.shift();this.particles.push({enemyFire:!!this.enemyFire,p:p.clone(),v:v.clone(),color:new THREE.Color(color),size,life,total:life,kind,delay,rotation:this.rand()*6.28,spin:(this.rand()-.5)*(kind==='smoke'?.22:1.4)});}
+ setLightBudget(count){
+  if(!Number.isInteger(count)||count<0||count>8)throw new RangeError('Light budget must be between 0 and 8');
+  for(const light of this.renderLights||[])light.removeFromParent();
+  this.lightBudget=count;this.renderLights=Array.from({length:count},()=>{const light=new THREE.PointLight(0xffffff,0,1,2);this.scene.add(light);return light;});
+ }
+ prepareLights(camera){
+  const candidates=this.lightCandidates??=[];candidates.length=0;
+  for(const slot of this.lights)if(slot.light.intensity>0)candidates.push(slot.light);
+  for(const light of this.rocketLights)if(light.intensity>0)candidates.push(light);
+  const score=light=>light.intensity/(1+(camera?camera.position.distanceToSquared(light.position):0));
+  candidates.sort((a,b)=>score(b)-score(a));
+  for(let i=0;i<this.renderLights.length;i++){const light=this.renderLights[i],source=candidates[i];light.intensity=source?.intensity||0;if(source){light.color.copy(source.color);light.position.copy(source.position);light.distance=source.distance;light.decay=source.decay;}}
+ }
+
+ emit(p,v,color,size,life,kind='dust',delay=0){const particle=this.particlePool.acquire();particle.p.copy(p);particle.v.copy(v);particle.color.set(color);Object.assign(particle,{enemyFire:!!this.enemyFire,size,life,total:life,kind,delay,rotation:this.rand()*6.28,spin:(this.rand()-.5)*(kind==='smoke'?.22:1.4)});}
+
  blood(pos,direction,scale=1){
   const axis=direction.clone().normalize();for(let i=0;i<Math.ceil(28*scale);i++){const velocity=axis.clone().multiplyScalar((2+this.rand()*5)*scale).add(new THREE.Vector3((this.rand()-.5)*5,1+this.rand()*4,(this.rand()-.5)*5));this.emit(pos,velocity,i%3?0x79131b:0xb62a27,.08+this.rand()*.18,.7+this.rand()*.8,'blood');this.particles.at(-1).stain=this.rand()<.4;}
   this.smear(pos,this.rand()*6.28,.3*scale);
@@ -124,7 +143,7 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
   this.scorch(pos,size*5);return profile;
  }
  muzzle(pos,dir){this.emit(pos,dir.clone().multiplyScalar(2),0xffffff,.85,.09,'spark');for(let i=0;i<4;i++)this.emit(pos,dir.clone().multiplyScalar(6+this.rand()*5),0xffd88e,.08,.12+this.rand()*.1,'ember');}
- machineGun(pos,dir,anchor=null){this.muzzleJet(pos,dir,.7,anchor);this.muzzle(pos,dir);this.emit(pos,dir.clone().multiplyScalar(1.6).add(new THREE.Vector3(0,.4,0)),0x82786a,.48,.55,'smoke',.035);this.flash(pos,38,.09,3.5);}
+ machineGun(pos,dir,anchor=null){this.muzzleJet(pos,dir,.7,anchor);this.muzzle(pos,dir);this.emit(pos,dir.clone().multiplyScalar(1.6).add(new THREE.Vector3(0,.4,0)),0x82786a,.48,.55,'smoke',.035);if(this.machineGunLightsEnabled)this.flash(pos,38,.09,3.5);}
  ricochet(pos,normal,velocity){this.muzzle(pos,normal);const reflected=velocity.clone().normalize();for(let i=0;i<9;i++)this.emit(pos,reflected.clone().multiplyScalar(5+this.rand()*12).add(new THREE.Vector3((this.rand()-.5)*4,this.rand()*3,(this.rand()-.5)*4)),0xffd897,.07,.2+this.rand()*.3,'ember');}
  cannon(pos,dir,chassis,scale=1,anchor=null){
   this.muzzleJet(pos,dir,4.2*scale,anchor);const side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0)).normalize();for(const sign of [-1,1])this.muzzleJet(pos,side.clone().multiplyScalar(sign).addScaledVector(dir,.25).normalize(),1.1*scale);
@@ -141,7 +160,7 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
   for(const w of this.shockwaves){if(!w.mesh.visible)continue;w.age+=dt;const t=Math.min(1,w.age/w.duration);w.mesh.material.uniforms.age.value=t;w.mesh.scale.setScalar(w.size*(.3+10*Math.pow(t,.65)));if(t>=1)w.mesh.visible=false;}
   this.updateScreens(dt);this.time+=dt;this.points.material.uniforms.time.value=this.time;this.hotPoints.material.uniforms.time.value=this.time;
   for(const slot of this.lights){if(slot.reserved)continue;slot.life=Math.max(0,slot.life-dt);slot.light.intensity=slot.power*Math.pow(slot.life/slot.total,2);}
-  for(let i=this.particles.length-1;i>=0;i--){const p=this.particles[i];if(p.delay>0){p.delay-=dt;continue;}p.life-=dt;if(p.life<=0){this.particles.splice(i,1);continue;}
+  for(let i=this.particles.length-1;i>=0;i--){const p=this.particles[i];if(p.delay>0){p.delay-=dt;continue;}p.life-=dt;if(p.life<=0){this.particlePool.remove(i);continue;}
    const age=p.total-p.life,progress=age/p.total;
    if(p.flameJet){p.v.copy(p.jetDir).multiplyScalar(20).addScaledVector(p.jetSide,Math.sin(age*18+p.phase)*age*5);p.v.y+=age*2;}else if(p.blastDust){p.v.multiplyScalar(Math.exp(-dt*2.3));}else if(p.screen){p.v.multiplyScalar(Math.exp(-dt*.8));}else if(p.vehicleDust){const blend=1-Math.exp(-dt*(p.landing?1.1:1.5)),wind=p.wind||.45;p.v.x+=(wind+Math.sin(p.p.z*.16+this.time*.3)*.14-p.v.x)*blend;p.v.z+=(.16+Math.cos(p.p.x*.12-this.time*.25)*.12-p.v.z)*blend;p.v.y+=(.06-p.v.y)*(1-Math.exp(-dt*.65));}else if(p.trail){p.v.x+=(.1-p.v.x)*(1-Math.exp(-dt*1.8));p.v.z+=(.04-p.v.z)*(1-Math.exp(-dt*1.8));p.v.y*=Math.exp(-dt*.6);}else if(p.kind==='smoke'){
     const follow=1-Math.exp(-dt*(p.blast?1.5:p.plume?1.2:.35)),phase=p.p.y*.5-this.time*.65;
@@ -149,7 +168,7 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
     p.v.x+=(windX-p.v.x)*follow;p.v.z+=(windZ-p.v.z)*follow;
     p.v.y+=((p.plume?2.5:1.3)*(1-progress*.65)-p.v.y)*(1-Math.exp(-dt*.5));
    }else{p.v.multiplyScalar(Math.exp(-dt*(p.flameJet?0:p.blastFire?3.5:p.kind==='ember'?.2:.65)));if(p.kind==='ember'||p.kind==='blood')p.v.y-=14*dt;else p.v.y+=.25*dt;}
-   p.p.addScaledVector(p.v,dt);if(p.trail||p.blastDust)p.p.y=Math.max(p.p.y,terrainHeight(p.p.x,p.p.z)+.08);if(p.kind==='blood'&&p.p.y<=terrainHeight(p.p.x,p.p.z)+.04){if(p.stain)this.smear(p.p,p.rotation,.08+this.rand()*.09);this.particles.splice(i,1);continue;}p.rotation+=p.spin*dt;
+   p.p.addScaledVector(p.v,dt);if(p.trail||p.blastDust)p.p.y=Math.max(p.p.y,terrainHeight(p.p.x,p.p.z)+.08);if(p.kind==='blood'&&p.p.y<=terrainHeight(p.p.x,p.p.z)+.04){if(p.stain)this.smear(p.p,p.rotation,.08+this.rand()*.09);this.particlePool.remove(i);continue;}p.rotation+=p.spin*dt;
   }
   if(prepare)this.prepare();
  }
@@ -159,18 +178,23 @@ float t=vUv.y,w=(.13+.34*sin(t*3.14159))*(1.-t*.65),edge=abs(vUv.x-.5);float tur
  prepare(camera){
   for(const flash of this.muzzleFlashes)if(flash.group.visible)flash.presented=true;
   for(const flash of this.muzzleFlashes)if(flash.enemyFire&&flash.group.visible&&!this.visibility?.sampledVisible(flash.group.position))flash.group.visible=false;
-  for(const slot of this.lights)if(slot.enemyFire&&!this.visibility?.sampledVisible(slot.light.position))slot.light.intensity=0;
-  const a=this.points.geometry.attributes,visible=this.particles.filter(p=>p.delay<=0&&(!p.enemyFire||this.visibility?.sampledVisible(p.p)));
+  for(const slot of this.lights)if(!slot.reserved){
+   const visible=!slot.enemyFire||this.visibility?.sampledVisible(slot.light.position);
+   slot.light.intensity=this.flashLightsEnabled&&visible?slot.power*Math.pow(slot.life/slot.total,2):0;
+  }
+  this.prepareLights(camera);
+  const visible=this.visibleParticles??=[];visible.length=0;const hotParticles=this.hotParticles??=[];hotParticles.length=0;
+  for(const p of this.particles)if(p.delay<=0&&(!p.enemyFire||this.visibility?.sampledVisible(p.p))){if(['spark','ember','fire'].includes(p.kind))hotParticles.push(p);else visible.push(p);}
   if(camera){camera.updateMatrixWorld();const m=camera.matrixWorldInverse.elements;for(const p of visible)p.depth=-(m[2]*p.p.x+m[6]*p.p.y+m[10]*p.p.z+m[14]);visible.sort((a,b)=>b.depth-a.depth);}
   this.vehicleDust.prepare(visible,camera);
-  let n=0;for(const p of visible){if(p.vehicleDust)continue;const progress=1-p.life/p.total,age=p.total-p.life,hot=['spark','ember','fire'].includes(p.kind),smoke=p.kind==='smoke';
+  for(const [mesh,particles] of [[this.points,visible],[this.hotPoints,hotParticles]]){const a=mesh.geometry.attributes;let n=0;for(const p of particles){if(p.vehicleDust)continue;const progress=1-p.life/p.total,age=p.total-p.life,hot=['spark','ember','fire'].includes(p.kind),smoke=p.kind==='smoke';
    const growth=p.screen?1+progress*.65:p.trail?1+progress*1.8:smoke?(p.blast?1+Math.sqrt(age)*1.05:p.plume?1+Math.sqrt(age)*1.3:1+Math.sqrt(age)*.7):1+progress*(p.flameJet?3.5:hot?.5:1.9);
    const fade=hot?Math.pow(1-progress,.6):Math.min(1,age/(smoke?.3:.08))*Math.pow(1-progress,smoke?.85:.65);
-   a.position.setXYZ(n,p.p.x,p.p.y,p.p.z);a.aColor.setXYZ(n,p.color.r,p.color.g,p.color.b);a.aSize.setX(n,p.size*growth);
+   a.aCenter.setXYZ(n,p.p.x,p.p.y,p.p.z);a.aColor.setXYZ(n,p.color.r,p.color.g,p.color.b);a.aSize.setX(n,p.size*growth);
    a.aAlpha.setX(n,fade*(p.density!==undefined?p.density:p.screen?.26:p.kind==='dust'?.38:smoke?(p.plume?.46:.54):.95));a.aAge.setX(n,progress);a.aKind.setX(n,p.kind==='fire'?1:p.kind==='spark'?2:p.kind==='ember'?3:p.kind==='blood'?4:p.screen?-2:p.trail?-1:0);a.aRotation.setX(n,p.rotation);n++;
   }
-  for(const attribute of Object.values(a))attribute.needsUpdate=true;this.points.geometry.setDrawRange(0,n);
+  for(const attribute of Object.values(a))if(attribute.isInstancedBufferAttribute&&n){attribute.clearUpdateRanges();attribute.addUpdateRange(0,n*attribute.itemSize);attribute.needsUpdate=true;}mesh.geometry.instanceCount=n;}
  }
 
- clear(){this.vehicleDust.mesh.geometry.instanceCount=0;this.headingMarker.visible=false;for(const light of this.rocketLights)light.intensity=0;for(const f of this.muzzleFlashes){f.life=0;f.group.visible=false;f.anchor=null;}for(const w of this.shockwaves)w.mesh.visible=false;this.screens.length=0;this.particles.length=0;for(const slot of this.lights){slot.life=0;slot.light.intensity=0;}this.tracks.count=0;this.trackIndex=0;this.scorches.count=0;this.scorchIndex=0;this.smears.count=0;this.smearIndex=0;}
+ clear(){for(const light of this.renderLights)light.intensity=0;this.points.geometry.instanceCount=this.hotPoints.geometry.instanceCount=0;this.vehicleDust.mesh.geometry.instanceCount=0;this.headingMarker.visible=false;for(const light of this.rocketLights)light.intensity=0;for(const f of this.muzzleFlashes){f.life=0;f.group.visible=false;f.anchor=null;}for(const w of this.shockwaves)w.mesh.visible=false;this.screens.length=0;this.particlePool.clear();for(const slot of this.lights){slot.life=0;slot.light.intensity=0;}this.tracks.count=0;this.trackIndex=0;this.scorches.count=0;this.scorchIndex=0;this.smears.count=0;this.smearIndex=0;}
 }

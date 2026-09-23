@@ -8,7 +8,7 @@ export class EnemyDirector {
   const g=this.game;
   for(let i=this.messages.length-1;i>=0;i--){const m=this.messages[i];m.delay-=dt;if(m.delay>0)continue;this.messages.splice(i,1);if(m.recipient.dead)continue;const a=m.recipient.ai;if(a.state!=='pursue'){a.state='investigate';a.lastKnown.copy(m.position);a.search=0;}}
   for(const t of [...g.tanks,...(g.soldiers||[])]){if(!t.enemy||t.dead)continue;const a=t.ai;
-   t.aiDt=dt;
+   t.aiDt=dt;t.steeringElapsed=(t.steeringElapsed||0)+dt;
    const sees=g.visibility.canSee(t,g.player);a.sees=sees;
    if(sees){a.lastKnown.copy(g.player.body.translation());a.lost=0;a.noticed+=dt;
     if(a.noticed>=.75){a.state='pursue';if(!a.engaged){a.engaged=true;a.radioAt=g.time+3;}}else if(a.state==='patrol')a.state='suspicious';
@@ -20,7 +20,12 @@ export class EnemyDirector {
  command(t){const g=this.game,a=t.ai,p=new THREE.Vector3().copy(t.body.translation());
   if(a.state==='patrol'&&(p.distanceTo(a.goal)<6||!a.waypoint||a.needsWaypoint)){a.needsWaypoint=false;a.waypoint++;const angle=t.aiPhase+a.waypoint*1.7;a.goal.set(clamp(a.home.x+Math.sin(angle)*36,-MAP_HALF+16,MAP_HALF-16),0,clamp(a.home.z+Math.cos(angle)*36,-MAP_HALF+16,MAP_HALF-16));a.goal.y=terrainHeight(a.goal.x,a.goal.z)+1;this.navigation.refresh();const free=this.navigation.freeNear(this.navigation.index(a.goal));if(free>=0)a.goal.copy(this.navigation.point(free));}
   const target=a.state==='patrol'?a.goal:a.lastKnown,delta=target.clone().sub(p);
-  const movement=this.navigation.steer(t,target,t.aiDt||1/60,a.state==='patrol'?.55:.8);
+  const tick=Math.round(g.time*60),phase=Math.floor(t.aiPhase*100)%3;
+  const urgent=!t.steeringCommand||t.steeringState!==a.state||t.steeringSees!==a.sees||t.steeringDamage!==t.recentDamageUntil;
+  if(urgent||((tick+phase)%3===0&&(!g.inFrame||g.frameTick===0))||t.steeringElapsed>=.1){
+   t.steeringCommand=this.navigation.steer(t,target,t.steeringElapsed||t.aiDt||1/60,a.state==='patrol'?.55:.8);t.steeringElapsed=0;t.steeringState=a.state;t.steeringSees=a.sees;t.steeringDamage=t.recentDamageUntil;
+  }
+  const movement=t.steeringCommand;
   if(a.state==='patrol'&&!t.navigation.path.length&&t.navigation.recovery<=0)a.needsWaypoint=true;
   t.aimTarget.copy(target);if(a.sees){t.aimTarget.x+=Math.sin(g.time*.8+t.aiPhase)*2.5;t.aimTarget.z+=Math.cos(g.time*.63+t.aiPhase)*2;}
   return {...movement,aim:t.aimTarget,fire:a.state==='pursue'&&a.sees&&Math.abs(angleDelta(t.turretYaw,Math.atan2(delta.x,delta.z)))<.12,secondary:false};

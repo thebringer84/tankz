@@ -4,6 +4,20 @@ export const interfaceAsset=file=>interfaceAssets.get(file)||import.meta.env.BAS
 // Yield through a paint before the next synchronous preparation stage.
 export const nextPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 
+// Let live simulation/driver work settle before uncovering the battlefield.
+// A consistently slow machine still gets a bounded hold, rather than a FPS gate.
+export function waitForDeploymentFrames(schedule=requestAnimationFrame){
+ return new Promise(resolve=>{
+  let start=null,last=null,steady=0;
+  const frame=now=>{
+   if(start===null)start=now;
+   steady=last!==null&&now-last<=34?steady+1:0;last=now;
+   if((now-start>=350&&steady>=6)||now-start>=1600)resolve();else schedule(frame);
+  };
+  schedule(frame);
+ });
+}
+
 export class LoadingScreen {
  constructor(element=document.querySelector('#loading')){this.element=element;this.progress=0;this.hideTimer=null;}
  show(title='PREPARING YOUR VEHICLE'){
@@ -12,6 +26,22 @@ export class LoadingScreen {
  }
  update(label,progress){const e=this.element;this.progress=Math.max(this.progress,Math.min(1,progress));const percent=Math.round(this.progress*100);e.querySelector('#loading-status').textContent=label;e.querySelector('#loading-percent').textContent=percent+'%';e.querySelector('[role="progressbar"]').setAttribute('aria-valuenow',percent);e.querySelector('#loading-fill').style.transform='scaleX('+this.progress+')';}
  hide(){this.update('Ready',1);this.element.classList.add('hidden');document.querySelector('#ui').inert=false;this.hideTimer=setTimeout(()=>{this.element.hidden=true;},350);}
+ async revealDeployment(game){
+  const e=this.element,ui=document.querySelector('#ui');let animation;
+  clearTimeout(this.hideTimer);e.classList.add('deployment-reveal');this.update('Ready',1);ui.inert=true;
+  game.deploymentIntro=true;game.firing=game.altFire=false;game.keys.clear();game.clock.getDelta();game.acc=0;game.loading=false;
+  try{
+   await waitForDeploymentFrames();
+   if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    animation=e.animate([{opacity:1},{opacity:0}],{duration:850,easing:'ease-in-out',fill:'forwards'});
+    await animation.finished;
+   }
+   e.hidden=true;
+  }finally{
+   animation?.cancel();e.classList.remove('deployment-reveal');game.deploymentIntro=false;
+   game.firing=game.altFire=false;game.keys.clear();ui.inert=false;
+  }
+ }
  fail(error){console.error(error);const e=this.element;e.classList.add('failed');e.querySelector('#loading-status').textContent='Preparation interrupted';e.querySelector('#loading-error').hidden=false;e.querySelector('#loading-error').textContent='Unable to prepare the scene. Reload to retry.';const retry=e.querySelector('#loading-retry');retry.hidden=false;retry.onclick=()=>location.reload();retry.focus();}
 }
 

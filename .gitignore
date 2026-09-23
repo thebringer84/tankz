@@ -11,3 +11,8 @@ test-artifacts/
 .codex/
 playwright-report/
 test-results/
+
+# Local performance captures
+/tankz-profile-*.json
+/Trace-*.json
+/Trace-*.json.gz

@@ -44,9 +44,8 @@ test('expanded world has distributed patrols, open jump lanes and local terrain 
    assert.ok(hit);assert.ok(Math.abs(20-hit.timeOfImpact-g.environment.surfaceHeight(x,z))<.001);
   }
   const far=g.soldiers.find(s=>s.body.translation().x>180);far.visibleToPlayer=false;far.ai.engaged=false;
-  const elapsed=[];for(let i=0;i<4;i++){g.infantry.update(1/60);elapsed.push(far.movementElapsed);g.world.step();}
-  assert.equal(elapsed.filter(t=>t===0).length,1);assert.ok(elapsed.some(t=>t>=2/60));
-  far.ai.engaged=true;g.infantry.update(1/60);assert.equal(far.movementElapsed,0);
+  for(let i=0;i<4;i++){g.infantry.update(1/60);g.world.step();assert.ok(Number.isFinite(far.body.translation().y));}
+  far.ai.sees=true;g.infantry.update(1/60);assert.equal(far.movementState.tier,0,'active combat promotes immediately');
   const jeeps=g.tanks.filter(t=>t.enemy);
   for(const jeep of jeeps.slice(0,8))g.hurt(jeep,100000,g.player);
   assert.equal(g.mode,'playing');assert.equal(g.kills,8);
@@ -86,5 +85,16 @@ test('turbo cannot drive through frontier fences on any edge',async()=>{
    for(let i=0;i<300;i++){g.drive(t,{throttle:1,boost:true,steer:0,aim},1/60);g.world.step();g.syncTank(t);const p=t.body.translation();assert.ok(Math.max(Math.abs(p.x),Math.abs(p.z))<MAP_SIZE/2-3,'chassis stays inside boundary');}
    assert.ok(new THREE.Vector3().copy(t.body.translation()).dot(forward)>MAP_SIZE/2-15,'reaches the barrier');
   }
+ }finally{freeWorld(g);}
+});
+
+test('deployment warm-up advances live simulation without consuming match time or player commands',async()=>{
+ const g=await worldFixture();try{
+  g.deploymentIntro=true;const timer=g.timer,time=g.time,hp=g.player.hp;
+  g.keys.add('KeyW');g.keys.add('Space');
+  for(let i=0;i<12;i++)g.step(1/60);
+  assert.equal(g.timer,timer);assert.equal(g.player.hp,hp);assert.equal(g.shells.length,0);assert.ok(g.time>time);
+  assert.equal(g.commandFor(g.player).throttle,0);g.keys.clear();g.deploymentIntro=false;g.step(1/60);
+  assert.ok(g.timer<timer);
  }finally{freeWorld(g);}
 });

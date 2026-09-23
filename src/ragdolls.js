@@ -1,3 +1,4 @@
+import {restoreCrew} from './infantry-skin.js';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {terrainHeight,seededRandom} from './config.js';
@@ -5,7 +6,7 @@ import {terrainHeight,seededRandom} from './config.js';
 export class Ragdolls {
  constructor(world,scene,fx){this.world=world;this.scene=scene;this.fx=fx;this.items=[];this.max=24;this.rand=seededRandom(7291);this.lastPattern=-1;}
  eject(crew,velocity,runOver=null){
-  if(this.items.length>=this.max)this.remove(this.items[0]);
+  restoreCrew(crew);if(this.items.length>=this.max)this.remove(this.items[0]);
   crew.root.updateWorldMatrix(true,true);
   const anchors=crew.links.map(([a,b,position])=>({a,b,world:crew.root.localToWorld(new THREE.Vector3(...position))}));
   const item={removed:false,parts:[],joints:[],links:[],age:0,crushed:false,runOver};const byName=new Map();

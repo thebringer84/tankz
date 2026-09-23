@@ -57,3 +57,74 @@ test('flamethrower death detonates once and launches dismembered parts upward',(
 test('partial track contact severs a leg and leaves a crawling survivor that can later be crushed',()=>{const g=setup(),s=g.infantry.spawn(0,15),p=s.body.translation();g.player.body.setTranslation({x:p.x-1.4,y:p.y,z:p.z},true);g.player.grounded=6;g.player.speed=5;g.infantry.sync();assert.ok(s.wounded&&!s.dead);assert.equal(s.woundType,'leg');assert.equal(s.crew.parts.length,9);assert.equal(s.locomotion,'crawl');g.infantry.sync();assert.equal(s.dead,false,'grace prevents same pass immediately killing edge-hit survivor');g.player.body.setTranslation({x:30,y:1,z:30},true);const start=new THREE.Vector3().copy(s.body.translation());for(let i=0;i<180;i++){g.infantry.update(1/60);g.world.step();g.infantry.sync();}assert.ok(!s.dead&&new THREE.Vector3().copy(s.body.translation()).distanceTo(start)>.3);assert.ok(g.smears>3);const now=s.body.translation();g.player.body.setTranslation({x:now.x,y:now.y+.6,z:now.z},true);g.infantry.sync();assert.ok(s.dead);g.world.free();});
 test('lower-body separation leaves a brief crawl before expiring safely',()=>{const g=setup(),s=g.infantry.spawn(0,15);g.infantry.wound(s,'lower');assert.equal(s.crew.parts.length,6);assert.equal(g.ragdolls.items[0].parts.length,5);assert.ok(!s.dead);for(let i=0;i<180;i++){g.infantry.update(1/60);g.world.step();}assert.ok(!s.dead);for(let i=0;i<210;i++){g.infantry.update(1/60);g.world.step();g.ragdolls.update(1/60,null);}assert.ok(s.dead);assert.equal(g.entities.has(s.collider.handle),false);assert.ok(g.ragdolls.items.every(r=>r.parts.every(p=>Number.isFinite(p.body.translation().x))));g.world.free();});
 test('successive dismemberments vary connected parts and scattering while retaining every body part',()=>{const g=setup(),patterns=new Set(),velocities=new Set();for(let i=0;i<8;i++){const s=g.infantry.spawn(20+i,15),start=g.ragdolls.items.length;g.infantry.kill(s,new THREE.Vector3(0,4,0),false,true);const fragments=g.ragdolls.items.filter(r=>r.age===0);patterns.add(g.ragdolls.lastPattern);for(const f of fragments){const v=f.parts[0].body.linvel();velocities.add(`${v.x.toFixed(2)},${v.z.toFixed(2)}`);}assert.ok(g.ragdolls.items.length<=g.ragdolls.max);while(g.ragdolls.items.length)g.ragdolls.remove(g.ragdolls.items[0]);}assert.ok(patterns.size>=3);assert.ok(velocities.size>20);g.world.free();});
+
+test('hidden pose culling preserves weapon readiness and reconstructs the current gait',()=>{
+ const g=setup();try{
+  const visible=g.infantry.spawn(-10,15,null,0,'rpg'),hidden=g.infantry.spawn(10,15,null,0,'rpg');
+  for(const s of [visible,hidden]){s.ai.sees=true;s.secondary=0;s.speed=3.8;}
+  for(let i=0;i<100;i++){animateInfantry(visible,1/60);animateInfantry(hidden,1/60,false);}
+  assert.equal(hidden.poseDirty,true);assert.equal(hidden.weaponRaise,visible.weaponRaise);assert.equal(hidden.weaponPose,visible.weaponPose);
+  assert.equal(hidden.gait.phase,visible.gait.phase);
+  g.infantry.pose(hidden);assert.equal(hidden.poseDirty,false);
+  for(let i=0;i<visible.crew.parts.length;i++){
+   const a=visible.crew.parts[i].mesh,b=hidden.crew.parts[i].mesh;
+   assert.ok(a.position.distanceTo(b.position)<1e-10);
+   assert.ok(a.quaternion.angleTo(b.quaternion)<1e-6);
+  }
+  assert.ok(visible.gun.position.distanceTo(hidden.gun.position)<1e-10);
+ }finally{g.world.free();}
+});
+
+test('distant investigators defer cover searches until interaction detail is needed',()=>{
+ const g=setup();try{
+  const s=g.infantry.spawn(30,30);s.ai.engaged=true;s.ai.sees=false;s.ai.state='investigate';s.movementState={tier:2};
+  g.infantry.decide(s,new THREE.Vector3().copy(s.body.translation()));assert.equal(g.infantry.coverJobs.has(s),false);
+  s.movementState.tier=0;g.infantry.decide(s,new THREE.Vector3().copy(s.body.translation()));assert.equal(g.infantry.coverJobs.has(s),true);
+  s.movementState.tier=2;g.infantry.plan();assert.equal(g.infantry.coverJobs.has(s),false);
+ }finally{g.world.free();}
+});
+
+test('engaged decisions stagger at 20 Hz while movement and weapon timing stay at 60 Hz',()=>{
+ const g=setup();try{
+  const soldiers=[0,1,2].map(i=>g.infantry.spawn(i*5,40,null,i));
+  for(const s of soldiers){s.ai.state='pursue';s.ai.sees=true;s.ai.engaged=true;s.ai.lastKnown.copy(s.body.translation()).add(new THREE.Vector3(0,0,20));s.yaw=0;}
+  const decisions=new Map(),moves=new Map(),shots=[];
+  g.infantry.decide=s=>{const ticks=decisions.get(s)||[];ticks.push(g.infantry.tick);decisions.set(s,ticks);return new THREE.Vector3();};
+  const move=g.infantry.movement.move.bind(g.infantry.movement);
+  g.infantry.movement.move=(s,...args)=>{moves.set(s,(moves.get(s)||0)+1);return move(s,...args);};
+  g.fire=s=>{shots.push({s,tick:g.infantry.tick});s.secondary=.11;};
+  g.infantry.update(1/60);g.world.step();decisions.clear();moves.clear();
+  for(let i=0;i<120;i++){g.time+=1/60;g.infantry.update(1/60);g.world.step();}
+  for(const s of soldiers){assert.equal(decisions.get(s).length,40);assert.equal(moves.get(s),120);}
+  assert.equal(new Set(soldiers.map(s=>decisions.get(s)[0])).size,3,'soldiers use different decision phases');
+  assert.ok(shots.some(({s,tick})=>!decisions.get(s).includes(tick)),'firing is not limited to decision ticks');
+ }finally{g.world.free();}
+});
+
+test('engaged decision throttling wakes for sight, state, damage, destroyed cover and new hazards',()=>{
+ for(const event of ['sight','state','damage','cover','hazard']){
+  const g=setup();try{
+   const s=g.infantry.spawn(0,40);s.ai.sees=true;s.ai.state='pursue';s.secondary=10;
+   let decisions=0;g.infantry.decide=()=>{decisions++;return new THREE.Vector3();};
+   g.infantry.update(1/60);g.world.step();assert.equal(decisions,1);
+   if(event==='sight')s.ai.sees=false;
+   if(event==='state')s.ai.state='investigate';
+   if(event==='damage')g.hurt(s,.1,g.player);
+   if(event==='cover')s.cover={prop:{destroyed:true}};
+   if(event==='hazard'){const p=s.body.translation();g.shells=[{body:{translation:()=>({x:p.x+20,y:p.y,z:p.z}),linvel:()=>({x:-100,y:0,z:0})}}];}
+   g.infantry.update(1/60);assert.equal(decisions,2,event+' must wake on unscheduled tick 2');
+  }finally{g.world.free();}
+ }
+});
+
+test('wounded soldiers choose independent crawl headings and phases rather than tracking the player',async()=>{
+ const {seededRandom}=await import('../src/config.js'),g=setup();
+ try{
+  const soldiers=[g.infantry.spawn(-30,25),g.infantry.spawn(-34,25),g.infantry.spawn(-38,25)];g.rand=seededRandom(871);
+  for(const s of soldiers)g.infantry.wound(s,'leg','L');
+  assert.equal(new Set(soldiers.map(s=>s.crawlHeading)).size,3);assert.equal(new Set(soldiers.map(s=>s.crawlPhase)).size,3);assert.equal(new Set(soldiers.map(s=>s.crawlRate)).size,3);
+  const headings=soldiers.map(s=>s.crawlHeading);g.player.body.setTranslation({x:80,y:1,z:-80},true);
+  for(const s of soldiers){const phase=s.crawlPhase;g.infantry.updateWounded(s,1/60);assert.ok(Math.abs(s.crawlPhase-phase-s.crawlRate/60)<1e-8);assert.equal(s.root.rotation.x,0);assert.equal(s.root.rotation.z,0);}
+  assert.deepEqual(soldiers.map(s=>s.crawlHeading),headings);
+ }finally{g.visibility.dispose();g.world.free();}
+});

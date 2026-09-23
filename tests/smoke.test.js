@@ -7,7 +7,7 @@ const setup=()=>{const root=new THREE.Group(),fx=new Effects(root,new THREE.Text
 test('smoke sorts far to near and fades smoothly at birth and expiry',()=>{
  const g=setup(),camera=new THREE.PerspectiveCamera();
  for(const z of [-2,-10,-5])g.fx.emit(new THREE.Vector3(0,1,z),new THREE.Vector3(),0x555555,1,2,'smoke');
- g.fx.prepare(camera);assert.equal(g.fx.points.geometry.attributes.position.getZ(0),-10);assert.equal(g.fx.points.geometry.attributes.aAlpha.getX(0),0);
+ g.fx.prepare(camera);assert.equal(g.fx.points.geometry.attributes.aCenter.getZ(0),-10);assert.equal(g.fx.points.geometry.attributes.aAlpha.getX(0),0);
  g.fx.update(.5);g.fx.prepare(camera);assert.ok(g.fx.points.geometry.attributes.aAlpha.getX(0)>0);
  for(let i=0;i<30;i++)g.fx.update(.1);assert.equal(g.fx.particles.length,0);
 });

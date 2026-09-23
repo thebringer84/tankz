@@ -1,10 +1,11 @@
+import {markTextureRows} from './texture-updates.js';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {MAP_SIZE,TERRAIN_SEGMENTS} from './config.js';
 const RES=2048,DEPTH=.075;
 export class TerrainRuts {
  constructor(geometry,world,segments=geometry.parameters.widthSegments||TERRAIN_SEGMENTS){
-  this.geometry=geometry;this.size=geometry.parameters.width||MAP_SIZE;this.dirtyVertices=new Set();this.patchColumns=Math.ceil(segments/18);this.world=world;this.segments=segments;this.base=Float32Array.from(geometry.attributes.position.array);this.data=new Uint8Array(RES*RES);this.dirty=new Set();this.timer=0;this.props=[];this.ruins=[];
+  this.geometry=geometry;this.size=geometry.parameters.width||MAP_SIZE;this.dirtyVertices=new Set();this.patchColumns=Math.ceil(segments/18);this.world=world;this.segments=segments;this.base=Float32Array.from(geometry.attributes.position.array);this.data=new Uint8Array(RES*RES);this.dirty=new Set();this.dirtyTexels=new Set();this.timer=0;this.props=[];this.ruins=[];
   this.texture=new THREE.DataTexture(this.data,RES,RES,THREE.RedFormat);this.texture.minFilter=this.texture.magFilter=THREE.LinearFilter;this.texture.needsUpdate=true;
   this.surfaceData=Float32Array.from({length:geometry.attributes.position.count},(_,i)=>geometry.attributes.position.getY(i));this.surfaceTexture=new THREE.DataTexture(this.surfaceData,segments+1,segments+1,THREE.RedFormat,THREE.FloatType);this.surfaceTexture.needsUpdate=true;
   // Small collision patches can be replaced independently after mesh displacement.
@@ -22,7 +23,7 @@ export class TerrainRuts {
   const co=Math.cos(yaw),si=Math.sin(yaw),cell=this.size/RES;
   for(const side of [-1,1]){const x=position.x+co*width*side,z=position.z-si*width*side,soft=this.softness(x,z);if(soft<.1)continue;
    const radius=.75*scale,ix=Math.floor((x/this.size+.5)*RES),iz=Math.floor((z/this.size+.5)*RES),reach=Math.ceil(radius/cell);
-   for(let dz=-reach;dz<=reach;dz++)for(let dx=-reach;dx<=reach;dx++){const tx=ix+dx,tz=iz+dz;if(tx<1||tz<1||tx>=RES-1||tz>=RES-1)continue;const wx=(tx+.5)*cell-this.size/2-x,wz=(tz+.5)*cell-this.size/2-z,across=Math.abs(wx*co-wz*si),along=Math.abs(wx*si+wz*co);const profile=(1-THREE.MathUtils.smoothstep(across,.18*scale,.46*scale))*(1-THREE.MathUtils.smoothstep(along,.25*scale,.7*scale));if(profile<=0)continue;const k=tz*RES+tx,target=Math.round(255*soft*profile);this.data[k]=Math.max(this.data[k],Math.min(target,this.data[k]+Math.ceil(target*.2)));}
+   for(let dz=-reach;dz<=reach;dz++)for(let dx=-reach;dx<=reach;dx++){const tx=ix+dx,tz=iz+dz;if(tx<1||tz<1||tx>=RES-1||tz>=RES-1)continue;const wx=(tx+.5)*cell-this.size/2-x,wz=(tz+.5)*cell-this.size/2-z,across=Math.abs(wx*co-wz*si),along=Math.abs(wx*si+wz*co);const profile=(1-THREE.MathUtils.smoothstep(across,.18*scale,.46*scale))*(1-THREE.MathUtils.smoothstep(along,.25*scale,.7*scale));if(profile<=0)continue;const k=tz*RES+tx,target=Math.round(255*soft*profile);const next=Math.max(this.data[k],Math.min(target,this.data[k]+Math.ceil(target*.2)));if(next!==this.data[k]){this.data[k]=next;this.dirtyTexels.add(k);}}
    const grid=this.size/this.segments,stride=this.segments+1;
    for(let vz=Math.max(0,Math.floor((z-radius+this.size/2)/grid));vz<=Math.min(this.segments,Math.ceil((z+radius+this.size/2)/grid));vz++)for(let vx=Math.max(0,Math.floor((x-radius+this.size/2)/grid));vx<=Math.min(this.segments,Math.ceil((x+radius+this.size/2)/grid));vx++){const id=vz*stride+vx,px=this.base[id*3],pz=this.base[id*3+2];this.geometry.attributes.position.setY(id,this.base[id*3+1]-this.sample(px,pz));this.dirtyVertices.add(id);this.markPatches(vx,vz);}
    this.changed=true;
@@ -47,11 +48,11 @@ export class TerrainRuts {
   const length=Math.hypot(nx,ny,nz)||1;this.geometry.attributes.normal.setXYZ(id,nx/length,ny/length,nz/length);
  }
  update(dt){
-  this.timer-=dt;if(!this.changed||this.timer>0)return;this.timer=.2;this.changed=false;this.texture.needsUpdate=true;
+  this.timer-=dt;if(!this.changed||this.timer>0)return;this.timer=.2;this.changed=false;markTextureRows(this.texture,this.dirtyTexels,RES);this.dirtyTexels.clear();
   const stride=this.segments+1,normals=new Set();
   for(const id of this.dirtyVertices){this.surfaceData[id]=this.geometry.attributes.position.getY(id);const x=id%stride,z=Math.floor(id/stride);for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){if(x+dx<0||x+dx>this.segments||z+dz<0||z+dz>this.segments)continue;normals.add((z+dz)*stride+x+dx);this.markPatches(x+dx,z+dz);}}
   for(const id of normals)this.updateNormal(id);
-  this.geometry.attributes.position.needsUpdate=true;this.geometry.attributes.normal.needsUpdate=true;this.surfaceTexture.needsUpdate=true;
+  this.geometry.attributes.position.needsUpdate=true;this.geometry.attributes.normal.needsUpdate=true;markTextureRows(this.surfaceTexture,this.dirtyVertices,stride);
   for(const id of this.dirty){const patch=this.patches[id];this.copyPatch(patch);patch.collider.setShape(new RAPIER.TriMesh(patch.vertices,patch.indices));
    if(patch.mesh){const attributes=patch.mesh.geometry.attributes;for(const key of ['position','normal']){const source=this.geometry.attributes[key];for(let i=0;i<patch.ids.length;i++)for(let j=0;j<3;j++)attributes[key].array[i*3+j]=source.array[patch.ids[i]*3+j];attributes[key].needsUpdate=true;}}
   }

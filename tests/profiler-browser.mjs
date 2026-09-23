@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import {chromium} from '@playwright/test';
+const browser=await chromium.launch({headless:true,args:['--enable-webgl']});
+try{
+ const page=await browser.newPage({viewport:{width:640,height:700},reducedMotion:'reduce'}),errors=[];
+ await page.routeWebSocket('**',()=>{});
+ page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});
+ await page.addInitScript(()=>localStorage.setItem('tankz-settings',JSON.stringify({quality:'low'})));
+ await page.goto('http://localhost:5173',{waitUntil:'domcontentloaded'});console.log('Loaded document');await page.waitForFunction(()=>window.tankz?.game?.running,null,{timeout:120000});
+ console.log('Game ready');
+ await page.evaluate(()=>{tankz.game.renderer.setSize(320,180,false);tankz.game.presentation.resize();window.originalProfilerFrame=tankz.game.frame;});
+ await page.locator('[data-action="settings"]').click();await page.getByRole('tab',{name:'GRAPHICS',exact:true}).click();
+ assert.equal(await page.getByRole('tab').count(),3);
+ assert.equal(await page.locator('#settings-panel-graphics #showProfiler').count(),1);
+ await page.getByLabel('Enable performance profiler').check();
+ await page.waitForFunction(()=>document.querySelector('[data-field="cpu"]').textContent!=='—',null,{timeout:30000});
+ console.log('Profiler enabled');
+ await page.screenshot({path:'/tmp/tankz-profiler-settings.png'});
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'Save last 15 s',exact:true}).click();
+ const saved=await download;const stream=await saved.createReadStream();let body='';for await(const chunk of stream)body+=chunk;
+ const report=JSON.parse(body);assert.ok(report.timeline.length>0);assert.ok(report.metadata.renderer);
+ await page.getByRole('button',{name:'DONE',exact:true}).click();
+ await page.evaluate(()=>{tankz.game.deploy();});
+ await page.waitForFunction(()=>Object.keys(tankz.ui.profiler.session.report().modes).some(k=>k.startsWith('playing')),null,{timeout:30000});
+ const stages=await page.evaluate(()=>Object.values(tankz.ui.profiler.session.report().modes).flatMap(m=>Object.keys(m.stages)));
+ assert.ok(stages.includes('simulation.infantry'));
+ await page.getByRole('button',{name:'Record 15 s',exact:true}).click();
+ await page.waitForFunction(()=>tankz.ui.profiler.capture&&tankz.ui.profiler.recordTimer===null,null,{timeout:45000});
+ assert.ok(await page.evaluate(()=>tankz.ui.profiler.capture.timeline.length>0));
+ await page.getByRole('button',{name:'Record 15 s',exact:true}).click();
+ await page.evaluate(()=>tankz.game.pause());await page.getByRole('tab',{name:'GRAPHICS',exact:true}).click();
+ await page.getByLabel('Enable performance profiler').uncheck();
+ assert.equal(await page.evaluate(()=>tankz.game.frame===window.originalProfilerFrame),true);
+ assert.equal(await page.evaluate(()=>tankz.ui.profiler.recordTimer),null);
+ assert.ok(await page.evaluate(()=>tankz.ui.profiler.capture.timeline.length>=0));
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('tankz-settings')).showProfiler),false);
+ assert.deepEqual(errors,[]);console.log('Profiler settings, deployment, export and disable checks passed.');
+}finally{await browser.close();}

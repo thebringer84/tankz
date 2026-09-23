@@ -57,6 +57,6 @@ export class DustRenderer {
   for(const p of particles){if(!p.vehicleDust)continue;const age=p.total-p.life,progress=age/p.total,growth=1+Math.sqrt(age)*p.spread,fade=Math.min(1,age/(p.wake?.55:.12))*Math.pow(1-progress,1.2);
    a.iCenter.setXYZ(n,p.p.x,p.p.y,p.p.z);a.iSize.setXY(n,p.size*growth,p.size*growth*(p.wake?.72:.82));a.iColor.setXYZ(n,p.color.r,p.color.g,p.color.b);a.iAlpha.setX(n,p.density*fade);a.iRotation.setX(n,p.rotation);a.iAge.setX(n,progress);n++;
   }
-  for(const [key,attribute] of Object.entries(a))if(key.startsWith('i'))attribute.needsUpdate=true;this.mesh.geometry.instanceCount=n;
+  for(const [key,attribute] of Object.entries(a))if(key.startsWith('i')&&n){attribute.clearUpdateRanges();attribute.addUpdateRange(0,n*attribute.itemSize);attribute.needsUpdate=true;}this.mesh.geometry.instanceCount=n;
  }
 }

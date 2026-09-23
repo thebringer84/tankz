@@ -39,8 +39,8 @@ export function makeMaterials(textures){
  };
 }
 
-function batchStaticMeshes(group,exclude){
- const batches=new Map();for(const child of [...group.children]){if(!child.isMesh||exclude.has(child))continue;child.updateMatrix();const geo=child.geometry.clone().applyMatrix4(child.matrix);if(!geo.index){/* normalized below */}const normalized=geo.index?geo.toNonIndexed():geo;if(normalized!==geo)geo.dispose();if(!batches.has(child.material))batches.set(child.material,[]);batches.get(child.material).push(normalized);group.remove(child);}
+export function batchStaticMeshes(group,exclude=new Set()){
+ const batches=new Map();for(const child of [...group.children]){if(!child.isMesh||exclude.has(child))continue;(group.batchedSources??=[]).push(child);child.updateMatrix();const geo=child.geometry.clone().applyMatrix4(child.matrix);if(!geo.index){/* normalized below */}const normalized=geo.index?geo.toNonIndexed():geo;if(normalized!==geo)geo.dispose();if(!batches.has(child.material))batches.set(child.material,[]);batches.get(child.material).push(normalized);group.remove(child);}
  for(const [material,geometries] of batches){const merged=mergeGeometries(geometries,false);if(merged){const mesh=new THREE.Mesh(merged,material);mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);}geometries.forEach(g=>g.dispose());}
 }
 

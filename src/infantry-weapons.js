@@ -20,11 +20,12 @@ export function equipSpecialist(crew,gun,muzzle,materials,weapon){
  for(const x of [-.12,.12])box(gear,materials.canvas,x,.77,.14,.055,.43,.045);
  crew.root.updateMatrixWorld(true);torso.attach(gear);return gear;
 }
-export function animateWeapon(s,dt){
+export function animateWeapon(s,dt,pose=true){
  if(s.weapon!=='rpg'&&s.weapon!=='flame')return;
  const rpg=s.weapon==='rpg',ready=s.ai?.sees&&!s.takingCover&&(rpg?s.secondary===0:!!s.flameFiring||s.secondary===0);
  s.weaponRaise=(s.weaponRaise||0)+((ready?1:0)-(s.weaponRaise||0))*(1-Math.exp(-dt*7));const b=s.weaponRaise;
  s.weaponPose=ready?(b>.92?(rpg?'aim':'fire-ready'):'shoulder'):(s.secondary>0?'reload':'carry');
+ if(!pose)return;
  const carry=new THREE.Vector3(.31,rpg?.56:.62,-.02),aim=new THREE.Vector3(rpg?.27:.18,rpg?1.0:.75,.10);
  s.gun.position.copy(carry.lerp(aim,b));s.gun.rotation.set(THREE.MathUtils.lerp(rpg?-1.15:.35,s.aimElevation||0,b),0,THREE.MathUtils.lerp(-.18,0,b));
  if(rpg){s.gun.userData.round.visible=s.secondary<1.4;s.gun.position.y-=Math.sin(Math.max(0,s.secondary-1.4)/3.4*Math.PI)*.06;}

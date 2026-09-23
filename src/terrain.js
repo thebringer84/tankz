@@ -6,7 +6,8 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import {terrainHeight,MAP_SIZE,MAP_HALF,TERRAIN_SEGMENTS,JUMP_RIDGES,seededRandom} from './config.js';
 import {fracturedStoneGeometry} from './debris.js';
 import {terrainSampler,alignToGround,seatOnGround} from './grounding.js';
-import {box,cylinder} from './models.js';
+import {freezeStatic,chunkInstances} from './render-geometry.js';
+import {box,cylinder,batchStaticMeshes} from './models.js';
 export function buildTerrain(scene,world,textures,materials,props,entities){
  const group=new THREE.Group();scene.add(group);const rand=seededRandom();
  const geo=new THREE.PlaneGeometry(MAP_SIZE,MAP_SIZE,TERRAIN_SEGMENTS,TERRAIN_SEGMENTS);geo.rotateX(-Math.PI/2);const p=geo.attributes.position;
@@ -31,13 +32,13 @@ export function buildTerrain(scene,world,textures,materials,props,entities){
  // Ruined blocks leave lanes wide enough for a broad tank and flank routes.
  const ruins=RUIN_SITES;
  for(let b=0;b<ruins.length;b++){
-  const [cx,cz]=ruins[b];
-  const floor=box(group,materials.concrete,cx,terrainHeight(cx,cz)+.06,cz,10,.16,9);floor.receiveShadow=true;
-  for(let j=0;j<5;j++)for(const axis of [0,1]){if((j===2&&axis===0)||(j===4&&axis===1))continue;const x=cx+(axis? -4.5:-4+j*2),z=cz+(axis?-4+j*2:-4.5),h=2+rand()*3.6;const mesh=new THREE.Mesh(new THREE.BoxGeometry(axis?.65:1.9,h,axis?1.9:.65),materials.concrete);addProp(mesh,x,terrainHeight(x,z)+h/2,z,axis?.325:.95,h/2,axis?.95:.325,190);box(group,materials.dark,x,terrainHeight(x,z)+h+.32,z,.045,.8,.045);}
+  const [cx,cz]=ruins[b],details=new THREE.Group();group.add(details);
+  const floor=box(details,materials.concrete,cx,terrainHeight(cx,cz)+.06,cz,10,.16,9);floor.receiveShadow=true;
+  for(let j=0;j<5;j++)for(const axis of [0,1]){if((j===2&&axis===0)||(j===4&&axis===1))continue;const x=cx+(axis? -4.5:-4+j*2),z=cz+(axis?-4+j*2:-4.5),h=2+rand()*3.6;const mesh=new THREE.Mesh(new THREE.BoxGeometry(axis?.65:1.9,h,axis?1.9:.65),materials.concrete);addProp(mesh,x,terrainHeight(x,z)+h/2,z,axis?.325:.95,h/2,axis?.95:.325,190);box(details,materials.dark,x,terrainHeight(x,z)+h+.32,z,.045,.8,.045);}
   for(let j=0;j<7;j++){const x=cx+(rand()-.5)*12,z=cz+(rand()-.5)*12;const sx=.45+rand()*.9,sy=.25+rand()*.35,sz=.5+rand()*.7;const mesh=new THREE.Mesh(fracturedStoneGeometry(1,rand),materials.concrete);mesh.scale.set(sx*1.25,sy*1.7,sz*1.3);addProp(mesh,x,terrainHeight(x,z)+sy,z,sx,sy,sz,90,true,120,true);}
   // Rusted beams keep the industrial silhouette above broken masonry.
-  for(let j=0;j<2;j++)box(group,materials.rust,cx-4.5+j*9,terrainHeight(cx,cz)+3,cz+3,.18,6,.18);
-  box(group,materials.rust,cx,terrainHeight(cx,cz)+5.9,cz+3,9,.2,.2);
+  for(let j=0;j<2;j++)box(details,materials.rust,cx-4.5+j*9,terrainHeight(cx,cz)+3,cz+3,.18,6,.18);
+  box(details,materials.rust,cx,terrainHeight(cx,cz)+5.9,cz+3,9,.2,.2);batchStaticMeshes(details);
  }
  const frontier=buildFrontier(group,world,materials,textures);
  const rockGeo=new THREE.DodecahedronGeometry(1,0);
@@ -54,5 +55,6 @@ export function buildTerrain(scene,world,textures,materials,props,entities){
  const shrubMat=new THREE.MeshStandardMaterial({color:0x7d8058,roughness:1,flatShading:true});const shrubGeo=new THREE.IcosahedronGeometry(1,1),shrubs=new THREE.InstancedMesh(shrubGeo,shrubMat,6000);const d=new THREE.Object3D();let n=0;
  for(let i=0;i<1100;i++){const x=(rand()-.5)*(MAP_SIZE-15),z=(rand()-.5)*(MAP_SIZE-15);if(Math.hypot(x,z-17)<7)continue;const size=.35+rand()*.75;for(let j=0;j<5;j++){d.position.set(x+(rand()-.5)*size,terrainHeight(x,z)+size*.33+rand()*.35,z+(rand()-.5)*size);d.scale.set(size*.42,size*(.2+rand()*.3),size*.32);d.rotation.set(rand(),rand()*6,rand());seatOnGround(d,shrubGeo,surfaceHeight,.07);shrubs.setMatrixAt(n++,d.matrix);}}
  const branches=new THREE.InstancedMesh(new THREE.CylinderGeometry(.025,.05,1,4),materials.canvas,1000);let bn=0;const twigRand=seededRandom(919);for(let i=0;i<900;i++){const x=(twigRand()-.5)*(MAP_SIZE-15),z=(twigRand()-.5)*(MAP_SIZE-15);d.position.set(x,terrainHeight(x,z)+.35,z);d.scale.set(1,.6+twigRand()*.5,1);d.rotation.set((twigRand()-.5)*.5,twigRand()*6,(twigRand()-.5)*.5);seatOnGround(d,branches.geometry,surfaceHeight,.06);branches.setMatrixAt(bn++,d.matrix);}branches.count=bn;group.add(branches);shrubs.count=n;shrubs.castShadow=true;shrubs.receiveShadow=true;group.add(shrubs);
+ group.add(chunkInstances(shrubs,MAP_SIZE),chunkInstances(branches,MAP_SIZE));freezeStatic(group,new Set(props.filter(p=>p.dynamic).map(p=>p.mesh)));
  ruts.props=props;ruts.ruins=ruins;return {group,terrain,frontier,ruins,surfaceHeight,shrubs,branches,ruts,jumpRocks,jumpRidges:JUMP_RIDGES};
 }

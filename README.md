@@ -13,6 +13,12 @@ npm run dev
 
 Open the local URL Vite prints (normally http://localhost:5173). A keyboard and mouse or touchpad are required. Chrome, Edge, Firefox, or Safari with WebGL2 is required. Audio starts after the first click.
 
+Deployment ends with a short black hold while live simulation settles, followed by
+an 850 ms fade into the battlefield. The hold waits for six steady frames after
+350 ms, with a 1.6-second maximum wait on slow machines. Weapons, damage, player
+commands and the match timer stay gated until the reveal finishes. Reduced-motion
+mode skips the animated fade. Profiler captures label these frames `deployment`.
+
 ## Self-host
 
 ```sh
@@ -111,7 +117,7 @@ The hunting crosshair stays within a central screen region; a locked target gets
 
 Terrain props are seated against the rendered mesh triangles using their transformed vertices. Rocks follow the local slope and embed slightly; each shrub clump and twig is grounded independently. Fuel drums use matching cylindrical physics shapes, and prop rotations are shared between rendering and collision.
 
-Ambient occlusion uses denoised GTAO contact shading around vehicles, rubble, rocks, and vegetation. Transparent smoke, fire, and decals are excluded from the occluder pass. High quality uses 16 samples at 75% resolution; Performance uses 8 samples at 50% resolution. AO composites before bloom and tone mapping.
+Ambient occlusion is disabled at all quality levels to avoid a second scene geometry pass. Directional shadows, fog, bloom, tone mapping and showroom antialiasing remain enabled as configured.
 
 The FPS counter can be enabled in Settings or the pause menu; the preference persists across reloads. It averages actual rendered frame timing over half a second. Infantry has blended walk/run/idle animations with articulated hips and knees, body bob, and weapon sway. Standing run-over victims briefly tumble, then leave a stain and separate physical limb groups. Running over a landed limb replaces it with a smaller smear.
 
@@ -182,7 +188,7 @@ Combat presentation: the cannon uses a generated gas-plume texture, an expanding
 
 The battlefield now covers approximately 539 × 539 m: 500% more area than the original 220 × 220 m map. Spaced rock and ruin clusters leave wider driving lanes. Twenty-four directional ridges and eight stone ramps include reserved approaches and landing corridors. The match timer is 15 minutes to accommodate the larger map and 25-jeep objective.
 
-Terrain uses 576 independently culled render/collision chunks. Track deformation updates only affected chunks and neighboring normals; navigation, fog, ground decals and minimap coordinates cover the full map. Distant hidden patrols update movement at staggered 15 Hz while nearby and alerted infantry remain at 60 Hz. Infantry uses spatial crowd separation instead of expensive character-controller autostep queries against other infantry; tank run-over detection remains active.
+Terrain uses 576 independently culled render/collision chunks. Track deformation updates only affected chunks and neighboring normals; navigation, fog, ground decals and minimap coordinates cover the full map. Infantry capsules advance at 60 Hz. Outside immediate interaction range, validated 0.1–0.2 second movement corridors amortize full character-controller queries. Decisions are staggered at 5–10 Hz for distant/visible troops; nearby hazards and active attackers retain full-rate handling. Hidden pose evaluation is deferred while animation and weapon-readiness clocks continue. Infantry uses spatial crowd separation; tank run-over detection remains active.
 
 Run `node scripts/benchmark-world.mjs` for a real-terrain, 250-infantry/25-jeep CPU simulation profile. A local 300-tick run measured 6.8 ms median and 10.0 ms p95, compared with 25.1/28.3 ms before the movement optimizations. This excludes GPU rendering and is not an FPS guarantee. `tests/world.test.js` checks population distribution, clear jump lanes, chunk deformation/seams, distant update scheduling, and physical ridge/stone launches and landings. The combat browser check also renders an outer-map ridge and verifies terrain frustum culling.
 
@@ -213,3 +219,81 @@ Dust now merges from both tracks into a broad lingering wake, includes stationar
 Additional browser checks: `TANKZ_BROWSER=chromium TANKZ_URL=http://localhost:5174 node tests/dust-browser.mjs` and `node tests/recon-browser.mjs` with the same environment. Captures are written under `test-artifacts/`.
 
 Audio files are organized under `public/audio/music/` and `public/audio/stingers/`. Machinery Waiting loops in the menu/hangar; victory and defeat cues play once on match results. All recordings are preloaded. Music and result stingers use Music volume; engine, weapon and UI sounds use SFX volume. Both settings are saved independently. See `public/audio/README.md` for the asset list.
+
+For rendering diagnostics, start the dev server and run `node scripts/profile-rendering.mjs`
+(use `TANKZ_BROWSER=chromium` for Playwright Chromium). `TANKZ_WIDTH` and
+`TANKZ_HEIGHT` override the 1440 × 900 viewport. The script reports the graphics
+backend, complete multi-pass draw counts, and CPU submission timings for a frozen
+menu/combat scene, comparing normal rendering and disabled shadows. These short samples exclude simulation and are not FPS
+or GPU benchmarks; SwiftShader results do not represent hardware GPU performance.
+
+The built-in profiler is available under **Settings → Graphics** or
+**Pause → Graphics**. Enable **Performance profiler** to show a floating panel
+while playing. The toggle persists across reloads; disabling it removes timing
+wrappers and GPU queries and stops any recording.
+
+The panel shows a rolling 15-second frame/CPU/GPU graph with 60/120 FPS budget
+lines, one-second stage averages, and simulation/controller/draw/projectile/particle
+counts. **Record 15 s** captures the next interval; **Export capture** downloads it.
+**Save last 15 s** immediately exports recent history. JSON includes individual
+frames, alert modes, stage costs, and per-frame quality/lighting settings. Missing
+GPU samples display as unavailable. CPU parent/child timings overlap.
+
+Use **Flash lighting** to compare an encounter with that lighting enabled/disabled.
+The switch affects the pooled muzzle/explosion lights; machine-gun point lighting
+is separately disabled by default and can be compared with **Machine-gun lighting**.
+The profiler itself adds measurement/display
+cost, so compare captures under the same conditions. History is limited to 60 seconds
+and 12,000 frames. Scene rebuilds reconnect instrumentation automatically.
+
+To diagnose the actual playing/paused frame loop on your own GPU, reload the game
+and run this in Chrome's console while deployed:
+
+```js
+copy(JSON.stringify(await tankz.profile(15000), null, 2))
+```
+
+Return focus to the game, play for about seven seconds, then press Escape and leave
+it paused until the capture finishes. The command copies the report. It separates
+playing/paused CPU stages, simulation ticks per frame, complete draw counts, and
+GPU render time when timer queries are supported. CPU stage timings are inclusive:
+`simulation.infantry` belongs to `simulation`, and `pass.*` belongs to `render`.
+Console-only captures remove instrumentation automatically afterward. With the panel
+enabled, console captures share its ongoing session. Capturing does not change quality settings.
+Playing frames are grouped as `playing.stealth`, `playing.spotted`, and
+`playing.engaged` using alert state at frame entry. For encounter diagnostics,
+spend the first few seconds unnoticed, then let the squad engage you. Captures
+include projectile/particle counts, projectile updates, shot creation, impacts,
+audio scheduling, movement hazards and route searches. These timings are inclusive.
+
+Machine-gun fire uses emissive muzzle flashes and smoke without point lighting by
+default. Cannon/explosion, wreck and rocket lighting remains enabled. To compare
+the former machine-gun lighting, set `tankz.game.fx.machineGunLightsEnabled = true`;
+restore `false` for the default. Capture metadata records both lighting switches
+at capture start, so keep them fixed during each capture.
+
+To isolate flash lighting during an encounter, set `tankz.game.fx.flashLightsEnabled = false`
+in the console, then restore it with `true`. This suppresses the pooled muzzle/explosion
+lights while preserving particles, projectiles, wreck/rocket lights and the scene light
+count. Compare captures with the same camera and encounter; reload restores the default.
+`node scripts/benchmark-encounter.mjs` compares CPU simulation with a ten-person squad
+passive, fighting, fighting without cover searches, and fighting without firing. It
+does not measure rendering or browser compositing.
+
+
+Infantry movement relevance includes swept vehicle/projectile approaches, recent damage,
+visibility and drone reveals. Promotion is immediate and demotion waits half a second.
+Cached corridors require static, gentle terrain support plus a swept capsule clearance
+check; walls, steep ground, moving support and unsafe corridors use the full controller.
+Engaged soldiers can also reuse 0.1-second corridors outside physical hazards;
+aiming and weapon timing still run at 60 Hz. Engaged movement/cover decisions run
+at a staggered 20 Hz (visible nonurgent: 10 Hz; distant: 5 Hz), with immediate
+decisions on state/sight changes, damage, destroyed cover and new physical hazards.
+Perception remains at 60 Hz. Stationary engaged soldiers
+check support every tick and periodically refresh full collision handling. Damage
+or swept hazards force full movement immediately, with a half-second quiet delay
+before reuse resumes.
+Distant investigators defer cover searches. Route/cover budgets are shared across all
+catch-up ticks in a rendered frame. Run `node scripts/benchmark-world.mjs --investigate`
+for a 250-investigator workload, or omit the flag for the patrol baseline. The design,
+tradeoffs and measurements are recorded in [docs/ai-performance.md](docs/ai-performance.md).

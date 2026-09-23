@@ -48,3 +48,16 @@ test('heap searches recover from unreachable routes and return independent valid
  nav.blocked.fill(0);const straight=nav.route({x:1,z:1},{x:21,z:21});
  assert.equal(straight.length,11);
 });
+
+test('catch-up ticks share the same render-frame planning budget',()=>{
+ const infantry=planner();let routes=0,cover=0;
+ infantry.navigation={route(){routes++;return [];}};
+ for(let i=0;i<40;i++){
+  const s={index:i,ai:{engaged:true},body:{translation:()=>({x:0,z:0})}};
+  infantry.routeJobs.set(s,new THREE.Vector3());
+  infantry.coverJobs.set(s,(function*(){for(let j=0;j<100;j++){cover++;yield;}})());
+ }
+ infantry.beginFrame();for(let i=0;i<5;i++)infantry.plan();
+ assert.equal(routes,4);assert.ok(cover<=32);infantry.endFrame();
+ infantry.beginFrame();infantry.plan();infantry.endFrame();assert.equal(routes,8);
+});

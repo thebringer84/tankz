@@ -31,6 +31,8 @@ body[data-screen=paused] .drone-target-frame,body[data-screen=paused] .drone-tar
 #loading{background:#121a16 url('/assets/loading-desert-survey.png') center/cover no-repeat;transition:opacity .3s ease;isolation:isolate}
 #loading::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#0c1510e8,#0c151080 65%,#0c151026)}
 #loading.hidden{opacity:0;pointer-events:none}#loading[hidden]{display:none}.loading-content{width:min(440px,90vw)}
+#loading.deployment-reveal{background:#000!important;transition:none;pointer-events:auto}
+#loading.deployment-reveal::before{display:none}#loading.deployment-reveal .loading-content{visibility:hidden}
 .loading-kicker{font:11px monospace;letter-spacing:2px;color:#afbeaa}.loading-brand{margin:24px 0 38px}
 #loading-title{font-size:20px;font-weight:600;letter-spacing:2px;margin:0 0 12px}#loading-status{font:13px monospace;color:#c5cabb;min-height:2.5em;line-height:1.5;margin:0 0 22px}
 .loading-meter{height:5px;background:#bdc8a62b;overflow:hidden}.loading-meter i{display:block;height:100%;background:#efbc56;transform:scaleX(0);transform-origin:left;transition:transform .18s linear;box-shadow:0 0 14px #efbc56}
@@ -58,3 +60,14 @@ body[data-screen=paused] .drone-target-frame,body[data-screen=paused] .drone-tar
 .settings-tab-panel .controls-grid{border-top:0;margin-top:0;padding-top:10px}
 .settings-panel .panel-actions{border-top:1px solid var(--line);padding-top:20px}
 @media(max-width:700px){.main-menu nav{margin-top:42px}.vehicle-caption{display:block;right:20px;bottom:46px}.vehicle-caption h2{font-size:26px}.vehicle-caption .eyebrow,.vehicle-caption>span:last-child{display:none}.ammo-shop{bottom:45px}.settings-tab-panel{min-height:0}.settings-tabs button{font-size:10px;letter-spacing:.5px}}
+
+/* Diagnostic panel deliberately avoids backdrop blur and animated decoration. */
+.performance-panel{color:#d2dbd5;background:#111a18;border:1px solid #53625b;padding:12px;font:11px monospace;max-width:100%;pointer-events:auto;box-sizing:border-box}
+.performance-panel[hidden]{display:none!important}.profiler-floating{position:fixed;right:14px;top:14px;width:340px;z-index:50;max-height:calc(100vh - 28px);overflow:auto}
+.performance-panel header,.profiler-summary,.profiler-legend{display:flex;justify-content:space-between;align-items:center;gap:8px}.performance-panel header{letter-spacing:1px;font-size:10px}.performance-panel header span{color:#8fb4a4}.profiler-summary{margin:12px 0 8px}.profiler-summary>b{font-size:18px;color:#eabd70}
+.performance-panel canvas{width:100%;height:90px;background:#0a110f;display:block}.profiler-legend{justify-content:flex-start;margin:6px 0;color:#c4cec7;font-size:10px}.profiler-legend span:nth-child(2){color:#eabd70}.profiler-legend span:nth-child(3){color:#77cbb4}.profiler-legend span:last-child{margin-left:auto;color:#83968b}
+.performance-panel table{width:100%;border-collapse:collapse;font-size:11px}.performance-panel th,.performance-panel td{padding:3px 0;text-align:left}.performance-panel th:last-child,.performance-panel td:last-child{text-align:right;font-variant-numeric:tabular-nums}.performance-panel th{color:#8ea497;font-weight:400;border-bottom:1px solid #35463d}
+.profiler-counts{line-height:1.6;margin:8px 0}.profiler-note{font:10px/1.5 monospace;color:#98aaa0;margin:6px 0}.profiler-actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.profiler-actions button{font:10px monospace;color:#d8e4da;background:#26392e;border:1px solid #526557;padding:7px;cursor:pointer}.profiler-actions button:disabled{opacity:.4;cursor:default}.profiler-switch{display:flex;align-items:center;gap:6px;margin-top:8px}.profiler-status{font-size:10px;color:#bad6c5;margin:6px 0 0}.performance-panel :focus-visible{outline:2px solid #eabd70;outline-offset:2px}
+#profiler-host{max-height:430px;overflow:auto}.settings-tabs{flex-wrap:wrap}
+@media(max-width:700px){.profiler-floating{width:290px;right:6px;top:6px}}
+.settings-panel{max-height:90vh;overflow:auto}
