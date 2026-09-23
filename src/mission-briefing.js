@@ -10,6 +10,14 @@ export function missionMarkup(game,id='dev-map'){
   <footer class="mission-launchbar"><div><span>SELECTED MISSION</span><strong>${m.name}</strong></div><button class="primary" data-action="launch-mission" data-value="${m.id}">LAUNCH MISSION <b>↗</b></button></footer>
  </main>`;
 }
+// Decode the actual image nodes before mounting, so even a cold cache cannot
+// reveal individual layers late. Keep these nodes when revealing the screen.
+export async function prepareMissionBriefing(game,id,progress=()=>{}){
+ const staging=document.createElement('div');staging.innerHTML=missionMarkup(game,id);
+ const images=[...staging.querySelectorAll('img')];let loaded=0;
+ await Promise.all(images.map(async image=>{await image.decode();progress(++loaded/images.length);}));
+ return staging.firstElementChild;
+}
 export function mountMissionBriefing(root){
  root.querySelector('[data-action="mission-back"]').focus({preventScroll:true});
  return ()=>{};

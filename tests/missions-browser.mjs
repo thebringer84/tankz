@@ -6,11 +6,20 @@ const browser=await chromium.launch({channel:'chrome',headless:true,args:['--ena
 const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 try{
+ let releaseArtwork,artworkRequested;
+ const artworkGate=new Promise(resolve=>{releaseArtwork=resolve;});
+ const artworkRequest=new Promise(resolve=>{artworkRequested=resolve;});
+ await page.route('**/missions/dev-map/foreground.png',async route=>{artworkRequested();await artworkGate;await route.continue();});
  await page.goto('http://localhost:5173');await page.waitForFunction(()=>window.tankz?.game.running,null,{timeout:120000});
  assert.equal(await page.evaluate(()=>tankz.game.selected),'scout');
- await page.locator('[data-action="deploy"]').click();await page.waitForSelector('.mission-screen');
+ await page.locator('[data-action="deploy"]').click();await artworkRequest;
+ assert.equal(await page.locator('.mission-screen').count(),0,'mission screen must wait for every layer');
+ assert.ok(await page.locator('#loading').isVisible());
+ assert.equal(await page.evaluate(()=>tankz.game.loading),true);
+ releaseArtwork();await page.waitForSelector('.mission-screen');
+ await page.waitForFunction(()=>!tankz.game.loading);
  assert.equal(await page.evaluate(()=>tankz.game.mode),'menu');assert.equal(await page.locator('#mission-title').textContent(),'Dev Map');
- await page.waitForFunction(()=>[...document.querySelectorAll('.mission-screen img')].every(i=>i.complete&&i.naturalWidth>0));
+ assert.equal(await page.locator('.mission-screen img').evaluateAll(images=>images.length===6&&images.every(i=>i.complete&&i.naturalWidth>0)),true);
  await page.screenshot({path:'test-artifacts/mission-overview.png'});
  assert.equal(await page.locator('.mission-scroll,.mission-loadout,[data-action="mission-garage"]').count(),0);
  for(const selector of ['.mission-tank','.mission-foreground','.mission-refinery'])assert.equal(await page.locator(selector).evaluate(e=>getComputedStyle(e).opacity),'1');
