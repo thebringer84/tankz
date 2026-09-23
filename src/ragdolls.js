@@ -20,9 +20,9 @@ export class Ragdolls {
   crew.root.visible=false;this.items.push(item);return item;
  }
  remove(item){if(item.removed)return;item.removed=true;for(const part of item.parts){this.world.removeRigidBody(part.body);part.mesh.removeFromParent();}const index=this.items.indexOf(item);if(index>=0)this.items.splice(index,1);}
- dismember(item,yaw,scale,launch=new THREE.Vector3()){
+ dismember(item,yaw,scale,launch=new THREE.Vector3(),crushed=false){
   if(item.removed)return;
-  const torso=item.parts[0].body.translation();this.fx.smear(new THREE.Vector3(torso.x,terrainHeight(torso.x,torso.z),torso.z),yaw,scale);
+  const torso=item.parts[0].body.translation();this.onBodyImpact?.(torso,crushed);this.fx.smear(new THREE.Vector3(torso.x,terrainHeight(torso.x,torso.z),torso.z),yaw,scale);
   const patterns=[
    [['torso','pelvis'],['head'],['upperArmL','forearmL'],['upperArmR','forearmR'],['thighL','shinL'],['thighR','shinR']],
    [['torso','head'],['pelvis','thighL','shinL'],['upperArmL'],['forearmL'],['upperArmR','forearmR'],['thighR'],['shinR']],
@@ -38,11 +38,34 @@ export class Ragdolls {
    while(this.items.length>=this.max)this.remove(this.items[0]);this.items.push({removed:false,parts,joints:links.map(l=>l.joint),links,age:0,limb:true,pattern,bleedTimer:this.rand()*.12,bleedDuration:.7+this.rand()*.8,landed:false,crushed:false,runOver:null});
   });
  }
+ updateCrawler(item,dt){
+  const crawl=item.crawl,torso=item.parts.find(p=>p.name==='torso')||item.parts[0],p=torso.body.translation();
+  if(!crawl.started){
+   if(item.age<.65)return;
+   const hit=this.world.castRay(new RAPIER.Ray({x:p.x,y:p.y+.1,z:p.z},{x:0,y:-1,z:0}),.85,true,undefined,undefined,undefined,torso.body,c=>!c.parent()||c.parent().isFixed());
+   if(!hit){if(item.age>5)item.crawl=null;return;}
+   crawl.started=true;for(const part of item.parts)for(let i=0;i<part.body.numColliders();i++)part.body.collider(i).setFriction(.25);
+  }
+  crawl.remaining-=dt;crawl.phase+=dt*5;
+  if(crawl.remaining<=0){for(const part of item.parts){part.body.resetForces(true);part.body.resetTorques(true);for(let i=0;i<part.body.numColliders();i++)part.body.collider(i).setFriction(.85);}item.crawl=null;item.crawlExpired=true;this.fx.bloodLanding?.(new THREE.Vector3().copy(p),.45);return;}
+  const fade=Math.min(1,crawl.remaining),pulse=.35+.65*Math.max(0,Math.sin(crawl.phase)),speed=.65*pulse*fade;
+  const direction=new THREE.Vector3(Math.sin(crawl.heading),0,Math.cos(crawl.heading));
+  for(const part of item.parts){
+   const body=part.body,v=body.linvel(),mass=body.mass();body.resetForces(true);body.resetTorques(true);
+   // Grounded, jointed dragging: the chest pulls while alternating arms paddle.
+   const arm=part.name.startsWith('forearm'),side=part.name.endsWith('L')?-1:1;
+   const reach=arm?Math.sin(crawl.phase+(side<0?Math.PI:0))*.5:0;
+   body.addForce({x:(direction.x*(speed+reach)-v.x)*mass*28,y:0,z:(direction.z*(speed+reach)-v.z)*mass*28},true);
+   if(arm)body.addTorque({x:direction.z*side*mass*2*fade,y:0,z:-direction.x*side*mass*2*fade},true);
+  }
+  crawl.bleed-=dt;if(crawl.bleed<=0){crawl.bleed=.55;this.fx.smear(new THREE.Vector3().copy(p),crawl.heading,.12);}
+ }
  update(dt,tank){
   // Splitting an earlier item can evict later entries from this snapshot.
   // Their Rapier bodies are already freed; never touch them again.
   for(const item of [...this.items]){if(item.removed)continue;item.age+=dt;for(const part of item.parts){part.mesh.position.copy(part.body.translation());part.mesh.quaternion.copy(part.body.rotation());}
    const torso=item.parts[0].body.translation();
+   if(item.crawl)this.updateCrawler(item,dt);
    if(item.limb){
     if(item.age<item.bleedDuration){item.bleedTimer-=dt;if(item.bleedTimer<=0){item.bleedTimer=.10+this.rand()*.09;this.fx.bloodTrail?.(new THREE.Vector3().copy(torso),new THREE.Vector3().copy(item.parts[0].body.linvel()));}}
     if(!item.landed&&item.age>.25){const origin={x:torso.x,y:torso.y+.12,z:torso.z},hit=this.world.castRay(new RAPIER.Ray(origin,{x:0,y:-1,z:0}),.45,true,undefined,undefined,undefined,item.parts[0].body,c=>!c.parent()||c.parent().isFixed());if(hit){item.landed=true;this.fx.bloodLanding?.(new THREE.Vector3(torso.x,origin.y-hit.timeOfImpact,torso.z),.3+this.rand()*.35);}}
@@ -52,12 +75,12 @@ export class Ragdolls {
     // Ground and scenery still collide; downward pressure lasts through the initial tumble.
     for(const part of item.parts){part.body.resetForces(true);if(item.age<.4)part.body.addForce({x:0,y:-part.body.mass()*35,z:0},true);}
     const ground=terrainHeight(torso.x,torso.z);
-    if(item.age>=.55&&(torso.y<ground+.8||item.age>=.9)){this.dismember(item,item.runOver.yaw,item.runOver.scale);continue;}
+    if(item.age>=.55&&(torso.y<ground+.8||item.age>=.9)){this.dismember(item,item.runOver.yaw,item.runOver.scale,new THREE.Vector3(),true);continue;}
    }
 
    if(tank&&!tank.dead&&tank.grounded>0&&Math.abs(tank.speed)>.65&&!item.runOver&&item.age>.45){
     const ground=terrainHeight(torso.x,torso.z),local=new THREE.Vector3().copy(torso).sub(tank.body.translation()).applyQuaternion(new THREE.Quaternion().copy(tank.body.rotation()).invert());
-    if(torso.y<ground+.65&&Math.abs(local.x)<1.6*tank.cfg.scale&&Math.abs(local.z)<2*tank.cfg.scale&&local.y<.1&&local.y>-1.65*tank.cfg.scale){if(item.limb){this.fx.smear(new THREE.Vector3(torso.x,ground,torso.z),tank.yaw,.35);item.crushed=true;this.remove(item);}else this.dismember(item,tank.yaw,tank.cfg.scale);continue;}
+    if(torso.y<ground+.65&&Math.abs(local.x)<1.6*tank.cfg.scale&&Math.abs(local.z)<2*tank.cfg.scale&&local.y<.1&&local.y>-1.65*tank.cfg.scale){if(item.limb){this.onBodyImpact?.(torso,true);this.fx.smear(new THREE.Vector3(torso.x,ground,torso.z),tank.yaw,.35);item.crushed=true;this.remove(item);}else this.dismember(item,tank.yaw,tank.cfg.scale,new THREE.Vector3(),true);continue;}
    }
    if(item.age>45)this.remove(item);
   }

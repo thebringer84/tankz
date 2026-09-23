@@ -20,7 +20,7 @@ export const TANKS = {
 export const AMMO = {
   ap:{name:'AP', label:'ARMOR PIERCING', speed:68, damage:230, radius:1.5, price:0, pack:0, color:0xffe4a0, desc:'High velocity. Concentrated damage. Unlimited standard rounds.'},
   he:{name:'HE', label:'HIGH EXPLOSIVE', speed:47, damage:155, radius:7.5, price:150, pack:8, color:0xff8b37, desc:'Large blast radius. Clears rubble, cover and clustered enemies.'},
-  sabot:{name:'APDS', label:'DISCARDING SABOT', speed:100, damage:350, radius:0.7, price:220, pack:6, color:0xadebff, desc:'Very high velocity and penetration. Minimal blast radius.'}
+  canister:{name:'CAN', label:'ANTI-PERSONNEL CANISTER', speed:240, damage:48, radius:0, range:38, pellets:48, spread:Math.PI/18, price:180, pack:8, color:0xffdd99, desc:'48 pellets in a wide cone. Deadly to nearby infantry; weak against armor. 38 m maximum range, no blast.'}
 };
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export const angleDelta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));

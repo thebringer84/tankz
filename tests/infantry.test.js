@@ -198,7 +198,7 @@ for(const variant of [0,1,2])test(`burning infantry flee, stop combat, and expir
   for(let i=0;i<60;i++){g.time+=1/60;g.infantry.update(1/60);g.world.step();g.infantry.sync();}
   assert.ok(start.distanceTo(new THREE.Vector3().copy(s.body.translation()))>1);assert.equal(g.shells.length,0);assert.equal(s.gun.visible,false);assert.ok(screams>0&&flames>0);
   for(let i=0;i<300&&!s.dead;i++){g.time+=1/60;g.infantry.update(1/60);g.world.step();}
-  assert.ok(s.dead);assert.equal(g.entities.has(s.collider.handle),false);assert.equal(g.ragdolls.items.length,1);
+  assert.ok(s.dead);assert.equal(screams,1);assert.equal(g.entities.has(s.collider.handle),false);assert.equal(g.ragdolls.items.length,1);
  }finally{g.world.free();}
 });
 test('blast ignition is a small chance for survivors and never delays lethal damage',()=>{
@@ -213,5 +213,13 @@ test('flamethrower contact ignites infantry while retaining direct damage to veh
   const source=g.infantry.spawn(0,15,null,0,'flame'),target=g.infantry.spawn(0,20);g.muzzle=()=>({p:new THREE.Vector3(0,1,15),dir:new THREE.Vector3(0,0,1)});
   g.world.castRay=()=>({timeOfImpact:5,collider:target.collider});g.infantry.flameAttack(source,1/60);assert.ok(target.burning);assert.equal(target.hp,32);
   const hp=g.player.hp;g.world.castRay=()=>({timeOfImpact:5,collider:g.player.collider});g.infantry.flameAttack(source,1/60);assert.ok(g.player.hp<hp);
+ }finally{g.world.free();}
+});
+
+test('canister consumes one round, uses the cannon reload, and creates no explosive shell',()=>{
+ const g=setup();try{
+  g.inventory={canister:2};g.ammo='canister';g.onEvent=()=>{};g.shake=0;g.fx.cannon=()=>{};let blasts=0;g.blast=()=>blasts++;
+  g.fire(g.player,false);assert.equal(g.inventory.canister,1);assert.equal(g.player.reload,g.player.cfg.reload);assert.equal(g.shells.length,0);assert.equal(blasts,0);
+  g.inventory.canister=0;g.fire(g.player,false);assert.equal(g.ammo,'ap');assert.equal(g.inventory.canister,0);
  }finally{g.world.free();}
 });

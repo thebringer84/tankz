@@ -39,5 +39,5 @@ export function updateBurning(infantry,s,dt){
  infantry.movement.tier(s,p,dt);infantry.movement.move(s,p,motion,dt,infantry.controller,infantry.navigation);
  animateInfantry(s,dt);poseBurning(s);
  b.emit-=dt;if(b.emit<=0){b.emit=.075;if(s.visibleToPlayer!==false)g.fx.burningInfantry?.(p,s.wounded);}
- b.scream-=dt;if(b.scream<=0){b.scream=1+g.rand()*.6;g.audio.scream?.(p.distanceTo(g.player.root.position),b.variant);}
+ b.scream-=dt;if(b.scream<=0){b.scream=Infinity;g.audio.scream?.(p.distanceTo(g.player.root.position),b.variant);}
 }

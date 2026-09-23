@@ -38,7 +38,7 @@ Eliminate 25 enemy patrol jeeps within 15 minutes. Select a tank and load ammuni
 | Mouse / touchpad | Choose turret bearing; range and elevation are automatic |
 | Left mouse **or Space** | Fire main gun; hold for repeated shots |
 | Right mouse | Fire coaxial gun |
-| 1 / 2 / 3 | AP / HE / APDS ammunition |
+| 1 / 2 / 3 | AP / HE / canister ammunition |
 | Q | Deploy smoke; interrupts AI targeting |
 | Shift + W | Turbo boost (hold; recharges when released) |
 | R | Recover an overturned or stuck tank; 12-second cooldown |
@@ -53,7 +53,7 @@ The larger amber crosshair remains the predicted impact from the **current** gun
 
 - Three distinct tank configurations: Kestrel scout, Vanguard medium, Marauder heavy. Mass, acceleration, speed, armor, gun strength, reload, traverse and elevation rates differ.
 - Dynamic rigid-body chassis with six suspension probes, ground grip, differential steering, braking, hill jumps and physical collisions. Rocks use their transformed triangle meshes, so low sloped rocks can be crawled over; chassis undersides are bevelled to avoid snagging on low lips.
-- Fixed 60 Hz simulation. Each shell and coaxial round is a distinct Rapier rigid body, with gravity, continuous collision detection and an additional swept collision check. AP, HE and APDS have different velocity, damage, blast radius and price.
+- Fixed 60 Hz simulation. Each shell and coaxial round is a distinct Rapier rigid body, with gravity, continuous collision detection and an additional swept collision check. AP and HE are physical shells. Canister fires 48 cover-blocked pellet rays in a 20° cone, with damage falling to zero at 38 m, weak armor damage, and no explosive splash.
 - Direction-only mouse aiming with automatic target acquisition/range, followed by hull-pitch/roll compensation and inherited-velocity compensation in ballistic aiming. Traverse and elevation remain rate-limited. Predicted impact checks intervening physical cover.
 - Heightfield-style mesh terrain with matching triangle-mesh collision, generated desert albedo/normal/height maps, rotated multi-scale texture splatting, bedrock blending and broad color variation.
 - Procedural 3D vehicle meshes with generated armor paint; ruins with generated concrete, sandstone rocks, shrubs, movable rubble, explosive fuel drums, destructible wall segments and physical debris.
